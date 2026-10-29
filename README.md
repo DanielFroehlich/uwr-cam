@@ -7,18 +7,6 @@
 
 ---
 
-## 🤖 AI Development & Provenance
-
-> **This project is 100% vibe-coded with [Gemini CLI](https://gemini.google.com/).**  
-> All architecture specifications, component designs, Python implementations, FFmpeg transcoding filtergraphs, MediaMTX streaming configurations, containerfiles, orchestration scripts, and automated test suites are authored interactively with Gemini acting as the software engineering agent under human direction.
-
-Every commit in this repository carries co-authorship by Gemini:
-```text
-Co-authored-by: Gemini CLI <gemini@google.com>
-```
-
----
-
 ## 🏊 Overview & Objective
 
 **`uwr-cam`** is an automated, real-time video stream analyzer and production switcher controller specifically tailored for **Underwater Rugby (UWR)** broadcasts.
@@ -113,6 +101,11 @@ vlc --network-caching=150 rtsp://localhost:8554/cam1/high
 See [`cam-sim/README.md`](cam-sim/README.md) for complete details.
 
 ---
+🤖 AI Development & Provenance
+
+> **This project is 100% vibe-coded with [Gemini CLI](https://gemini.google.com/).**  
+> All architecture specifications, component designs, Python implementations, FFmpeg transcoding filtergraphs, MediaMTX streaming configurations, containerfiles, orchestration scripts, and automated test suites are authored interactively with Gemini acting as the software engineering agent under human direction.
+
 
 ## 📄 License
 
