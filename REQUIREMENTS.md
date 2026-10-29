@@ -163,6 +163,9 @@ The project also includes a dedicated **Camera Simulator Tool (`cam-sim`)** that
   - Maximum end-to-end latency of **100 ms** from frame capture to switching command dispatch.
 - **NFR-2 Implementation Stack**:
   - **Phase 1 (Rapid Prototyping & Iteration)**: Implemented in **Python** using asynchronous I/O (`asyncio`), low-latency video decoding (OpenCV / PyAV / FFmpeg), and WebSocket client libraries.
+  - **Hardware Acceleration (Apple Silicon)**:
+    - On macOS Apple Silicon, containerized Linux guests run via CPU (ARMv8 NEON).
+    - To leverage Apple Silicon's **Metal Performance Shaders (MPS)** or **Apple Neural Engine (ANE)** for sub-10ms computer vision inference, the detection engine must support native host execution (`.venv` on macOS) as well as containerized execution.
   - **Architecture Portability**: Design clean, decoupled abstractions (ingestion, detection, arbitration, OBS client) to allow future porting to **Go** for ultra-low latency execution if required.
 - **NFR-3 Resource Efficiency**:
   - Low-resolution processing must remain lightweight to sustain multi-stream processing (up to 6 streams simultaneously) on standard commodity hardware.
