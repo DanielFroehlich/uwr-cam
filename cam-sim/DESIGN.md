@@ -95,8 +95,15 @@ Given a set of input MP4 video recordings, `cam-sim` simulates **2 to 6 IP camer
 - **Video Codec**: `libx264` (H.264)
 - **Preset**: `ultrafast`
 - **Tune**: `zerolatency`
-- **GOP Size**: 30 frames (1 keyframe per second at 30 fps) for instantaneous client connection without waiting for long keyframe intervals.
-- **Transport**: RTSP over TCP (`-rtsp_transport tcp`) for reliable local inter-process publishing to MediaMTX.
+- **GOP Size**: 15 frames (2 keyframes per second at 30 fps) for instantaneous client connection.
+- **Header Repetition**: `-x264-params repeat-headers=1:scenecut=0` ensuring SPS/PPS parameter sets are prepended to every single I-frame.
+- **Inter-Process Transport**: RTSP over TCP (`-rtsp_transport tcp`) for reliable publishing from FFmpeg to MediaMTX.
+
+#### 3.5. Configurable RTSP Delivery Transports (Dev vs. Production)
+- **Decision**: Provide configurable `server.rtsp_transports` (`["tcp"]`, `["udp"]`, or `["tcp", "udp"]`).
+- **Rationale**:
+  - **Development Mode (`["tcp"]`)**: Recommended when running in Podman on macOS. Avoids macOS hypervisor UDP NAT routing issues and prevents video players (VLC, etc.) from hitting 10-second UDP retry timeouts.
+  - **Production Mode (`["udp"]` or `["tcp", "udp"]`)**: Dedicated wired Ethernet cable network on the pool deck. RTP over UDP eliminates TCP retransmission buffers and head-of-line blocking, which is mandatory to guarantee the strict **<100ms end-to-end latency** requirement.
 
 ---
 
@@ -110,6 +117,8 @@ version: "1.0"
 server:
   rtsp_port: 8554                 # RTSP port exposed to clients
   bind_address: "0.0.0.0"         # Listen on all interfaces
+  rtsp_transports:                # Delivery transports allowed for clients
+    - "tcp"                       # ["tcp"] for local dev; ["udp"] or ["tcp", "udp"] for wired prod
 
 # Default encoding parameters
 defaults:
@@ -117,7 +126,7 @@ defaults:
   video_codec: "libx264"
   preset: "ultrafast"
   tune: "zerolatency"
-  gop_size: 30
+  gop_size: 15                    # 2 keyframes per second at 30fps
 
 # Simulated Cameras (2 to 6 cameras supported)
 cameras:

@@ -1,0 +1,75 @@
+# ==============================================================================
+# cam-sim: Active Configuration
+# ==============================================================================
+
+version: "1.0"
+
+server:
+  rtsp_port: 8554
+  bind_address: "0.0.0.0"
+  rtsp_transports: ["tcp"]        # ["tcp"] for macOS Podman dev; ["udp"] or ["tcp", "udp"] for dedicated wired production
+
+defaults:
+  loop: true
+  video_codec: "libx264"
+  preset: "ultrafast"
+  tune: "zerolatency"
+  gop_size: 15
+
+cameras:
+  - id: "cam1"
+    name: "Underwater Goal Left"
+    source: "/videos/goal_left.mp4"
+    feeds:
+      low_res:
+        enabled: true
+        path: "/cam1/low"
+        width: 640
+        height: 360
+        fps: 30
+        bitrate: "1000k"
+      high_res:
+        enabled: true
+        path: "/cam1/high"
+        width: 1920
+        height: 1080
+        fps: 30
+        bitrate: "6000k"
+
+  - id: "cam2"
+    name: "Underwater Goal Right"
+    source: "/videos/goal_right.mp4"
+    feeds:
+      low_res:
+        enabled: true
+        path: "/cam2/low"
+        width: 640
+        height: 360
+        fps: 30
+        bitrate: "1000k"
+      high_res:
+        enabled: true
+        path: "/cam2/high"
+        width: 1920
+        height: 1080
+        fps: 30
+        bitrate: "6000k"
+
+  - id: "cam3"
+    name: "Surface Center Overview"
+    source: "/videos/center_overview.mp4"
+    feeds:
+      low_res:
+        enabled: true
+        path: "/cam3/low"
+        width: 640
+        height: 360
+        fps: 30
+        bitrate: "1000k"
+      high_res:
+        enabled: true
+        path: "/cam3/high"
+        width: 1920
+        height: 1080
+        fps: 30
+        bitrate: "6000k"

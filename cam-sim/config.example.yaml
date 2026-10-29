@@ -1,0 +1,80 @@
+# ==============================================================================
+# cam-sim: Camera Stream Simulator Configuration
+# ==============================================================================
+
+version: "1.0"
+
+# RTSP Server Configuration
+server:
+  rtsp_port: 8554                 # Port on which the RTSP server listens for clients
+  bind_address: "0.0.0.0"         # Listen on all network interfaces
+  rtsp_transports:                # Allowed RTSP media delivery transports
+    - "tcp"                       # Use ["tcp"] for local macOS Podman dev to avoid VM UDP NAT routing limits
+                                  # Use ["udp"] or ["tcp", "udp"] for dedicated zero-latency wired production networks
+
+# Default encoding parameters applied to feeds unless overridden
+defaults:
+  loop: true                      # Loop input video continuously in real-time
+  video_codec: "libx264"          # Video encoder
+  preset: "ultrafast"             # Low-latency encoder preset
+  tune: "zerolatency"             # Disable B-frames and lookahead for real-time
+  gop_size: 15                    # Keyframe interval (2 keyframes per second at 30 fps for fast client lock-on)
+
+# Simulated Cameras (Between 2 and 6 cameras supported)
+cameras:
+  - id: "cam1"
+    name: "Underwater Goal Left"
+    source: "/videos/goal_left.mp4"
+    feeds:
+      low_res:
+        enabled: true
+        path: "/cam1/low"          # Stream URL: rtsp://<host>:8554/cam1/low
+        width: 640
+        height: 360
+        fps: 30
+        bitrate: "1000k"
+      high_res:
+        enabled: true
+        path: "/cam1/high"         # Stream URL: rtsp://<host>:8554/cam1/high
+        width: 1920
+        height: 1080
+        fps: 30
+        bitrate: "6000k"
+
+  - id: "cam2"
+    name: "Underwater Goal Right"
+    source: "/videos/goal_right.mp4"
+    feeds:
+      low_res:
+        enabled: true
+        path: "/cam2/low"          # Stream URL: rtsp://<host>:8554/cam2/low
+        width: 640
+        height: 360
+        fps: 30
+        bitrate: "1000k"
+      high_res:
+        enabled: true
+        path: "/cam2/high"         # Stream URL: rtsp://<host>:8554/cam2/high
+        width: 1920
+        height: 1080
+        fps: 30
+        bitrate: "6000k"
+
+  - id: "cam3"
+    name: "Surface Center Overview"
+    source: "/videos/center_overview.mp4"
+    feeds:
+      low_res:
+        enabled: true
+        path: "/cam3/low"          # Stream URL: rtsp://<host>:8554/cam3/low
+        width: 640
+        height: 360
+        fps: 30
+        bitrate: "1000k"
+      high_res:
+        enabled: true
+        path: "/cam3/high"         # Stream URL: rtsp://<host>:8554/cam3/high
+        width: 1920
+        height: 1080
+        fps: 30
+        bitrate: "6000k"

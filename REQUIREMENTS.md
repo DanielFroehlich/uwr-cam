@@ -89,7 +89,7 @@ The project also includes a dedicated **Camera Simulator Tool (`cam-sim`)** that
   - Each camera (physical or simulated) acts as an RTSP server exposing two endpoints:
     1. **Low-Resolution Feed** (e.g. `rtsp://<camera-ip>:8554/<cam-id>/low`): Pulled by `uwr-cam` for real-time computer vision inference.
     2. **High-Resolution Feed** (e.g. `rtsp://<camera-ip>:8554/<cam-id>/high`): Pulled directly by OBS Studio for high-definition broadcast output.
-- **FR-1.3 Protocol Support**: Standard RTSP (Real Time Streaming Protocol) carrying RTP/H.264 (supporting both TCP interleaved and UDP RTP transport).
+- **FR-1.3 Protocol & Transport Support**: Standard RTSP (Real Time Streaming Protocol) carrying RTP/H.264. Must support configurable media delivery transports: **RTP over UDP** (mandatory in production on dedicated wired cable networks to eliminate TCP retransmission latency spikes and meet the 100ms latency ceiling) and **RTP interleaved over TCP** (for local containerized development and NAT traversal).
 - **FR-1.4 Low Latency Ingestion**: Drop buffered/queued frames immediately if processing falls behind to guarantee zero latency accumulation (real-time stream analysis).
 - **FR-1.5 Fault Tolerance & Auto-Reconnection**: Automatically attempt reconnection if an RTSP connection drops or experiences network interruptions, without crashing the application.
 
@@ -138,8 +138,9 @@ The project also includes a dedicated **Camera Simulator Tool (`cam-sim`)** that
 - **FR-6.1 Component Isolation & Independent Configuration**:
   - Located in its own dedicated component directory (`cam-sim/`).
   - Governed by its own dedicated YAML configuration file (`cam-sim/config.yaml`).
-- **FR-6.2 RTSP Server Architecture**:
+- **FR-6.2 RTSP Server Architecture & Configurable Transports**:
   - Hosts an embedded RTSP server exposing a standard RTSP port (default `8554`).
+  - Supports configurable client delivery transports (`rtsp_transports`): TCP for local containerized development and UDP for dedicated low-latency wired production networks.
   - Allows external clients (OBS Studio, `uwr-cam`, VLC, ffplay) to connect and pull streams on demand.
 - **FR-6.3 MP4 Ingestion & Endless Loop**:
   - Accept an MP4 video file as the source for each simulated camera.

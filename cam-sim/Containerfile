@@ -1,0 +1,46 @@
+FROM python:3.12-slim-bookworm
+
+# Prevent Python from writing .pyc files and enable unbuffered output
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+# Install runtime dependencies: FFmpeg, curl, and procps
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    curl \
+    procps \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install MediaMTX RTSP Server (auto-detects arm64 vs amd64)
+ARG MEDIAMTX_VERSION=v1.21.3
+RUN ARCH=$(uname -m) && \
+    if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
+        MTX_ARCH="linux_arm64"; \
+    elif [ "$ARCH" = "x86_64" ]; then \
+        MTX_ARCH="linux_amd64"; \
+    else \
+        MTX_ARCH="linux_arm64"; \
+    fi && \
+    echo "Downloading MediaMTX ${MEDIAMTX_VERSION} for ${MTX_ARCH}..." && \
+    curl -f -L -s "https://github.com/bluenviron/mediamtx/releases/download/${MEDIAMTX_VERSION}/mediamtx_${MEDIAMTX_VERSION}_${MTX_ARCH}.tar.gz" \
+    | tar -xz -C /usr/local/bin/ mediamtx && \
+    chmod +x /usr/local/bin/mediamtx
+
+WORKDIR /app
+
+# Install Python requirements
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy source code and default config
+COPY src/ /app/src/
+COPY config.example.yaml /app/config.yaml
+
+# Volume mount for MP4 videos
+VOLUME /videos
+
+# Expose RTSP port
+EXPOSE 8554
+
+ENTRYPOINT ["python3", "-m", "src.main", "--config", "/app/config.yaml"]
