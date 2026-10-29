@@ -184,17 +184,23 @@ The project also includes a dedicated **Camera Simulator Tool (`cam-sim`)** that
 
 ### 5. Next Steps & Implementation Roadmap
 
-1. **Phase 1: cam-sim Implementation**:
+1. **Phase 1: cam-sim Implementation [COMPLETED]**:
    - Create ARM64 `Containerfile` for `cam-sim` with embedded RTSP server and FFmpeg.
    - Implement YAML parser, FFmpeg publishing pipeline, and process supervisor.
    - Validate with synthetic test video and client connection tests (OpenCV / ffprobe / VLC).
-2. **Phase 2: uwr-cam Configuration & OBS WebSocket Client**:
-   - Define `config.yaml` schema and hot-reload watcher.
-   - Implement `obs-websocket` v5 client for scene switching and connection management.
-3. **Phase 3: Video Ingestion & Motion Detection**:
-   - Implement low-latency RTSP frame grabber with frame dropping.
-   - Implement motion density calculation (optical flow / frame differencing).
-4. **Phase 4: Ball Detection & Scoring Engine**:
+2. **Phase 2: uwr-cam Configuration & OBS WebSocket Client [COMPLETED]**:
+   - Component directory `uwr-cam-engine/` configured for native macOS Apple Silicon execution with MPS GPU acceleration.
+   - Define `config.yaml` schema with Pydantic validation (2-6 cameras, unique IDs/URLs/scenes, fallback protection).
+   - Implement asynchronous, debounced hot-reload watcher (`ConfigWatcher`).
+   - Implement decoupled OBS WebSocket v5 client (`OBSClientProtocol` / `ObswsPythonClient`) with non-blocking thread delegation, auto-reconnect, and scene existence verification.
+   - Deliver 30 unit tests covering configuration validation, hot-reloading, and OBS switching.
+3. **Phase 3: Video Ingestion & Motion Detection [COMPLETED]**:
+   - Threaded low-latency RTSP frame grabber with zero-latency frame dropping (`FrameGrabber`).
+   - Adaptive background subtraction motion detector (`MotionDetectorMOG2`) learning dynamic water ripples and scoring player activity.
+   - Multi-camera pipeline manager with future-proof `CVResult` data contract prepared for Phase 4 ball detection.
+   - Multi-tier logging: detailed per-frame DEBUG tracing and periodic aggregated status summaries at INFO level (configurable via `status_interval_sec`).
+   - Validated against live `cam-sim` dual-resolution RTSP streams and OBS Studio.
+4. **Phase 4: Ball Detection & Scoring Engine [NEXT]**:
    - Ingest training MP4 footage from user.
    - Evaluate and integrate ball detector (e.g., color/contour segmentation or lightweight YOLO model).
    - Implement score aggregation and switching arbitration (dwell time / hysteresis).

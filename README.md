@@ -75,12 +75,29 @@ The system ingests video feeds from multiple IP cameras (2 to 6 cameras), analyz
 | Component | Directory | Status | Description |
 | :--- | :--- | :--- | :--- |
 | **`cam-sim`** | [`cam-sim/`](cam-sim/) | **Completed** | Multi-camera RTSP simulator reading MP4 match files and streaming dual-resolution feeds in an endless loop via embedded MediaMTX and FFmpeg. |
-| **`uwr-cam`** | `src/` | *In Planning* | Central computer vision detection engine, stream frame grabber, arbitration logic, and OBS WebSocket v5 controller. |
+| **`uwr-cam-engine`** | [`uwr-cam-engine/`](uwr-cam-engine/) | **Phase 3 Complete** | Central computer vision detection engine, dynamic configuration hot-reloader, RTSP frame grabber, and OBS WebSocket v5 controller. |
 | **Specifications** | [`REQUIREMENTS.md`](REQUIREMENTS.md) | **Active** | System specification, architectural decisions, and functional requirements. |
 
 ---
 
-## 🚀 Quickstart: Camera Simulator (`cam-sim`)
+## 🚀 Quickstart: Camera Switcher Engine (`uwr-cam-engine`)
+
+To run the camera switcher engine natively on macOS with Apple Silicon GPU / MPS support:
+
+```bash
+# 1. Check OBS and cam-sim connectivity
+./uwr-cam-engine/run.sh status
+
+# 2. Run automated test suite
+./uwr-cam-engine/run.sh test
+
+# 3. Start the engine
+./uwr-cam-engine/run.sh start
+```
+
+---
+
+## 🎥 Quickstart: Camera Simulator (`cam-sim`)
 
 To test streaming without physical IP cameras, use the built-in simulator:
 

@@ -1,0 +1,52 @@
+# ==============================================================================
+# uwr-cam-engine: Active Configuration
+# ==============================================================================
+
+version: "1.0"
+
+# OBS Studio WebSocket v5 connection settings
+obs:
+  host: "localhost"
+  port: 4455
+  password: ""                     # Leave empty if authentication is disabled in OBS
+  timeout_sec: 3.0
+  reconnect_interval_sec: 3.0
+
+# Switching and arbitration parameters
+switching:
+  fallback_scene: "base"           # Default overview scene if no high-confidence tracking
+  min_dwell_time_sec: 2.5          # Minimum seconds to stay on a scene (anti-flapping)
+  hysteresis_threshold: 0.15       # Delta score required to switch away from current camera
+  fallback_timeout_sec: 5.0        # Seconds of inactivity before reverting to fallback scene
+  manual_override: false           # Pause automated switching for director control
+
+# Logging configuration
+logging:
+  level: "INFO"                    # DEBUG, INFO, WARNING, ERROR
+  status_interval_sec: 5.0         # Seconds between periodic CV status summaries
+
+# Camera inputs and OBS scene mappings (2 to 6 cameras)
+cameras:
+  - id: "cam1"
+    name: "Underwater Goal Left"
+    rtsp_url: "rtsp://localhost:8554/cam1/low"
+    obs_scene: "cam1"
+    weights:
+      ball: 0.7
+      motion: 0.3
+
+  - id: "cam2"
+    name: "Underwater Goal Right"
+    rtsp_url: "rtsp://localhost:8554/cam2/low"
+    obs_scene: "cam2"
+    weights:
+      ball: 0.7
+      motion: 0.3
+
+  - id: "cam3"
+    name: "Surface Center Overview"
+    rtsp_url: "rtsp://localhost:8554/cam3/low"
+    obs_scene: "cam3"
+    weights:
+      ball: 0.7
+      motion: 0.3
