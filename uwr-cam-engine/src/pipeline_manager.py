@@ -8,7 +8,7 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
-from .config import CameraConfig
+from .config import BallDetectorConfig, CameraConfig
 from .cv_pipeline import (
     BallDetectorProtocol,
     BallDetectorYOLO,
@@ -33,11 +33,15 @@ class CVResult:
 class CameraPipeline:
     """Combines a single camera frame grabber with its detection models."""
 
-    def __init__(self, config: CameraConfig) -> None:
+    def __init__(
+        self,
+        config: CameraConfig,
+        ball_detector: Optional[BallDetectorProtocol] = None,
+    ) -> None:
         self.config = config
         self.grabber = FrameGrabber(camera_id=config.id, rtsp_url=config.rtsp_url)
         self.motion_detector: MotionDetectorProtocol = MotionDetectorMOG2()
-        self.ball_detector: BallDetectorProtocol = BallDetectorYOLO()
+        self.ball_detector: BallDetectorProtocol = ball_detector or BallDetectorYOLO()
 
     def start(self) -> None:
         self.grabber.start()
@@ -55,13 +59,19 @@ class CameraPipeline:
         # 1. Compute motion density
         motion_score = self.motion_detector.process_frame(frame)
 
-        # 2. Compute ball detection confidence
-        ball_conf, ball_bbox = self.ball_detector.process_frame(frame)
-
-        # 3. Calculate composite camera score: S = (w_ball * B) + (w_motion * M)
-        w_ball = self.config.weights.ball
-        w_motion = self.config.weights.motion
-        composite_score = (w_ball * ball_conf) + (w_motion * motion_score)
+        # 2. Check if ball detection is enabled on detector
+        is_ball_enabled = getattr(self.ball_detector, "enabled", True)
+        if is_ball_enabled:
+            ball_conf, ball_bbox = self.ball_detector.process_frame(frame)
+            # Calculate composite camera score: S = (w_ball * B) + (w_motion * M)
+            w_ball = self.config.weights.ball
+            w_motion = self.config.weights.motion
+            composite_score = (w_ball * ball_conf) + (w_motion * motion_score)
+        else:
+            # Ball detector disabled: motion receives 100% weight
+            ball_conf = 0.0
+            ball_bbox = None
+            composite_score = motion_score
 
         return CVResult(
             camera_id=self.config.id,
@@ -73,12 +83,61 @@ class CameraPipeline:
 
 
 class PipelineManager:
-    """Manages all active camera pipelines."""
+    """Manages all active camera pipelines, sharing a single GPU ball detector instance."""
 
-    def __init__(self, camera_configs: List[CameraConfig]) -> None:
+    def __init__(
+        self,
+        camera_configs: List[CameraConfig],
+        ball_detector_config: Optional[BallDetectorConfig] = None,
+        ball_detector: Optional[BallDetectorProtocol] = None,
+    ) -> None:
+        if ball_detector is None:
+            if ball_detector_config is not None:
+                self.shared_ball_detector: BallDetectorProtocol = BallDetectorYOLO(
+                    model_name=ball_detector_config.model_name,
+                    confidence_threshold=ball_detector_config.confidence_threshold,
+                    classes=ball_detector_config.classes,
+                    enabled=ball_detector_config.enabled,
+                )
+            else:
+                self.shared_ball_detector = BallDetectorYOLO()
+        else:
+            self.shared_ball_detector = ball_detector
+
         self.pipelines: Dict[str, CameraPipeline] = {
-            cam.id: CameraPipeline(cam) for cam in camera_configs
+            cam.id: CameraPipeline(cam, ball_detector=self.shared_ball_detector)
+            for cam in camera_configs
         }
+
+    def update_ball_detector(self, ball_detector_config: BallDetectorConfig) -> None:
+        """Update ball detector settings dynamically without restarting video streams."""
+        if hasattr(self.shared_ball_detector, "update_config"):
+            self.shared_ball_detector.update_config(
+                enabled=ball_detector_config.enabled,
+                confidence_threshold=ball_detector_config.confidence_threshold,
+                model_name=ball_detector_config.model_name,
+                classes=ball_detector_config.classes,
+            )
+        else:
+            self.shared_ball_detector = BallDetectorYOLO(
+                model_name=ball_detector_config.model_name,
+                confidence_threshold=ball_detector_config.confidence_threshold,
+                classes=ball_detector_config.classes,
+                enabled=ball_detector_config.enabled,
+            )
+            for pipe in self.pipelines.values():
+                pipe.ball_detector = self.shared_ball_detector
+        logger.info(
+            f"Ball detector dynamically updated: enabled={ball_detector_config.enabled}, "
+            f"model='{ball_detector_config.model_name}', conf={ball_detector_config.confidence_threshold:.2f}"
+        )
+
+    def update_camera_weights(self, camera_configs: List[CameraConfig]) -> None:
+        """Update camera weights dynamically without restarting video streams."""
+        for cfg in camera_configs:
+            if cfg.id in self.pipelines:
+                self.pipelines[cfg.id].config.weights = cfg.weights
+        logger.info("Camera weights dynamically updated across all pipelines.")
 
     def start_all(self) -> None:
         """Starts all background grabbers."""

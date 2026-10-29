@@ -110,12 +110,35 @@ class LoggingConfig(BaseModel):
         return v
 
 
+class BallDetectorConfig(BaseModel):
+    """Configuration for deep-learning ball detection."""
+    enabled: bool = Field(default=True, description="Enable YOLO ball detection")
+    model_name: str = Field(
+        default="yolov8s-worldv2.pt",
+        description="YOLO model path or identifier (e.g. yolov8s-worldv2.pt or custom .pt)",
+    )
+    confidence_threshold: float = Field(
+        default=0.25,
+        ge=0.05,
+        le=1.0,
+        description="Minimum detection confidence threshold",
+    )
+    classes: List[str] = Field(
+        default=["underwater ball", "white ball"],
+        description="Open-vocabulary prompts for YOLO-World detection",
+    )
+
+
 class EngineConfig(BaseModel):
     """Root configuration model for uwr-cam-engine."""
     version: str = Field(default="1.0", description="Configuration schema version")
     obs: OBSConfig = Field(default_factory=OBSConfig, description="OBS WebSocket connection settings")
     switching: SwitchingConfig = Field(default_factory=SwitchingConfig, description="Switching arbitration settings")
     logging: LoggingConfig = Field(default_factory=LoggingConfig, description="Logging settings")
+    ball_detector: BallDetectorConfig = Field(
+        default_factory=BallDetectorConfig,
+        description="YOLO ball detector settings",
+    )
     cameras: List[CameraConfig] = Field(
         ...,
         min_length=2,

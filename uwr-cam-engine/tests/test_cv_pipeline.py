@@ -1,12 +1,14 @@
-"""Unit tests for MotionDetectorMOG2 and PipelineManager."""
+"""Unit tests for MotionDetectorMOG2, BallDetectorYOLO, and PipelineManager."""
 
 from __future__ import annotations
+
+from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
 
-from src.config import CameraConfig
-from src.cv_pipeline import MotionDetectorMOG2
+from src.config import BallDetectorConfig, CameraConfig, CameraWeights
+from src.cv_pipeline import BallDetectorYOLO, MotionDetectorMOG2
 from src.pipeline_manager import CVResult, PipelineManager
 
 
@@ -47,6 +49,44 @@ def test_motion_detector_invalid_input():
     assert detector.process_frame(np.array([])) == 0.0
 
 
+def test_ball_detector_disabled():
+    detector = BallDetectorYOLO(enabled=False)
+    frame = np.zeros((360, 640, 3), dtype=np.uint8)
+    conf, bbox = detector.process_frame(frame)
+    assert conf == 0.0
+    assert bbox is None
+
+
+def test_ball_detector_invalid_input():
+    detector = BallDetectorYOLO(enabled=False)
+    assert detector.process_frame(None) == (0.0, None)
+    assert detector.process_frame(np.array([])) == (0.0, None)
+
+
+def test_ball_detector_mocked_inference():
+    detector = BallDetectorYOLO(enabled=False)
+    detector.enabled = True
+    detector.confidence_threshold = 0.2
+
+    # Mock the internal YOLO model
+    mock_box = MagicMock()
+    mock_box.conf = [MagicMock(item=lambda: 0.85)]
+    mock_box.xywh = [MagicMock(tolist=lambda: [100, 150, 40, 40])]
+
+    mock_result = MagicMock()
+    mock_result.boxes = [mock_box]
+
+    mock_model = MagicMock()
+    mock_model.return_value = [mock_result]
+    detector._model = mock_model
+
+    frame = np.zeros((360, 640, 3), dtype=np.uint8)
+    conf, bbox = detector.process_frame(frame)
+
+    assert conf == 0.85
+    assert bbox == (100, 150, 40, 40)
+
+
 def test_pipeline_manager_cv_result_contract():
     configs = [
         CameraConfig(
@@ -54,16 +94,19 @@ def test_pipeline_manager_cv_result_contract():
             name="Camera 1",
             rtsp_url="rtsp://localhost:8554/cam1/low",
             obs_scene="cam1",
+            weights=CameraWeights(ball=0.7, motion=0.3),
         ),
         CameraConfig(
             id="cam2",
             name="Camera 2",
             rtsp_url="rtsp://localhost:8554/cam2/low",
             obs_scene="cam2",
+            weights=CameraWeights(ball=0.7, motion=0.3),
         ),
     ]
 
-    mgr = PipelineManager(configs)
+    ball_cfg = BallDetectorConfig(enabled=False)
+    mgr = PipelineManager(configs, ball_detector_config=ball_cfg)
     results = mgr.process_tick()
 
     assert "cam1" in results
@@ -72,6 +115,7 @@ def test_pipeline_manager_cv_result_contract():
     res1 = results["cam1"]
     assert isinstance(res1, CVResult)
     assert res1.camera_id == "cam1"
-    assert res1.motion_score == 0.0  # Not running yet
+    assert res1.motion_score == 0.0
     assert res1.ball_confidence == 0.0
     assert res1.ball_bbox is None
+    assert res1.score == 0.0

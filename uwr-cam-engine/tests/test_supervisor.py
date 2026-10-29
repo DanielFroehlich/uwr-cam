@@ -95,3 +95,23 @@ async def test_supervisor_on_config_reload_obs_change(mock_supervisor, mocker):
     mock_new_obs.verify_scenes.assert_awaited_once()
 
     await sup.stop()
+
+
+@pytest.mark.asyncio
+async def test_supervisor_on_config_reload_ball_detector_toggle(mock_supervisor):
+    sup, _, _, mock_pipeline_mgr, cfg = mock_supervisor
+    await sup.start()
+
+    # Create new config with ball_detector disabled
+    new_data = sample_valid_config_dict()
+    new_data["ball_detector"] = {"enabled": False}
+    new_cfg = EngineConfig.model_validate(new_data)
+
+    await sup.on_config_reload(cfg, new_cfg)
+
+    # update_ball_detector should have been invoked on pipeline_mgr
+    mock_pipeline_mgr.update_ball_detector.assert_called_once_with(new_cfg.ball_detector)
+    assert sup.config.ball_detector.enabled is False
+
+    await sup.stop()
+

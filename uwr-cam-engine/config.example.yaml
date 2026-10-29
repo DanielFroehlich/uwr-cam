@@ -25,6 +25,15 @@ logging:
   level: "INFO"                    # DEBUG, INFO, WARNING, ERROR
   status_interval_sec: 5.0         # Seconds between periodic CV status summaries
 
+# Ball detection engine configuration
+ball_detector:
+  enabled: true                    # Enable deep-learning ball detection
+  model_name: "yolov8s-worldv2.pt" # Pre-trained YOLO-World open-vocabulary model
+  confidence_threshold: 0.25       # Minimum confidence to score a ball detection
+  classes:
+    - "underwater ball"
+    - "white ball"
+
 # Camera inputs and OBS scene mappings (2 to 6 cameras)
 cameras:
   - id: "cam1"

@@ -42,6 +42,14 @@ htmlcov/
 # Keep video directory structure with .gitkeep
 !/**/videos/.gitkeep
 
+# Model weights & datasets (large binaries)
+*.pt
+*.pth
+*.onnx
+*.engine
+weights/
+datasets/
+
 # IDEs
 .idea/
 .vscode/

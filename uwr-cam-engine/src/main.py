@@ -51,7 +51,9 @@ class EngineSupervisor:
         self.config = config
         self.obs_client: OBSClientProtocol = ObswsPythonClient(self.config.obs)
         self.watcher: ConfigWatcher = ConfigWatcher(self.config_path, self.config)
-        self.pipeline_mgr: PipelineManager = PipelineManager(self.config.cameras)
+        self.pipeline_mgr: PipelineManager = PipelineManager(
+            self.config.cameras, ball_detector_config=self.config.ball_detector
+        )
         self.arbiter: SwitchingArbiter = SwitchingArbiter(
             self.config.switching, self.config.cameras
         )
@@ -145,12 +147,23 @@ class EngineSupervisor:
         ]
         await self.obs_client.verify_scenes(required_scenes)
 
-        # Check if cameras changed: restart pipelines if needed
-        if old_cfg.cameras != new_cfg.cameras:
-            logger.info("Camera configuration updated. Restarting video ingestion pipelines...")
+        # Check if ball detector configuration changed (updates dynamically without stream restart)
+        if old_cfg.ball_detector != new_cfg.ball_detector:
+            self.pipeline_mgr.update_ball_detector(new_cfg.ball_detector)
+
+        # Check if camera stream endpoints or camera list changed
+        old_urls = {c.id: c.rtsp_url for c in old_cfg.cameras}
+        new_urls = {c.id: c.rtsp_url for c in new_cfg.cameras}
+        if old_urls != new_urls or set(old_urls.keys()) != set(new_urls.keys()):
+            logger.info("Camera stream endpoints changed. Reconnecting video ingestion pipelines...")
             self.pipeline_mgr.stop_all()
-            self.pipeline_mgr = PipelineManager(new_cfg.cameras)
+            self.pipeline_mgr = PipelineManager(
+                new_cfg.cameras, ball_detector_config=new_cfg.ball_detector
+            )
             self.pipeline_mgr.start_all()
+        elif old_cfg.cameras != new_cfg.cameras:
+            # Only weights or metadata changed - update weights without dropping streams
+            self.pipeline_mgr.update_camera_weights(new_cfg.cameras)
 
         # Update arbiter with new switching and camera configs
         self.arbiter = SwitchingArbiter(
