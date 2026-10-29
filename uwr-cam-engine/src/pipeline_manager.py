@@ -9,7 +9,12 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 
 from .config import CameraConfig
-from .cv_pipeline import MotionDetectorMOG2, MotionDetectorProtocol
+from .cv_pipeline import (
+    BallDetectorProtocol,
+    BallDetectorYOLO,
+    MotionDetectorMOG2,
+    MotionDetectorProtocol,
+)
 from .ingestion import FrameGrabber
 
 logger = logging.getLogger(__name__)
@@ -20,8 +25,9 @@ class CVResult:
     """Structured result of computer vision processing for a camera."""
     camera_id: str
     motion_score: float = 0.0          # Phase 3: Motion density [0.0, 1.0]
-    ball_confidence: float = 0.0       # Phase 4 placeholder: Ball detection [0.0, 1.0]
-    ball_bbox: Optional[Tuple[int, int, int, int]] = None  # Phase 4 placeholder: (x, y, w, h)
+    ball_confidence: float = 0.0       # Phase 4: Ball detection confidence [0.0, 1.0]
+    ball_bbox: Optional[Tuple[int, int, int, int]] = None  # (x, y, w, h)
+    score: float = 0.0                 # Phase 4: Composite score = (w_ball * B) + (w_motion * M)
 
 
 class CameraPipeline:
@@ -31,6 +37,7 @@ class CameraPipeline:
         self.config = config
         self.grabber = FrameGrabber(camera_id=config.id, rtsp_url=config.rtsp_url)
         self.motion_detector: MotionDetectorProtocol = MotionDetectorMOG2()
+        self.ball_detector: BallDetectorProtocol = BallDetectorYOLO()
 
     def start(self) -> None:
         self.grabber.start()
@@ -43,16 +50,25 @@ class CameraPipeline:
         ret, frame = self.grabber.read_latest()
         if not ret or frame is None:
             # Stream not ready or offline
-            return CVResult(camera_id=self.config.id, motion_score=0.0)
+            return CVResult(camera_id=self.config.id, motion_score=0.0, score=0.0)
 
-        # Compute motion density
+        # 1. Compute motion density
         motion_score = self.motion_detector.process_frame(frame)
+
+        # 2. Compute ball detection confidence
+        ball_conf, ball_bbox = self.ball_detector.process_frame(frame)
+
+        # 3. Calculate composite camera score: S = (w_ball * B) + (w_motion * M)
+        w_ball = self.config.weights.ball
+        w_motion = self.config.weights.motion
+        composite_score = (w_ball * ball_conf) + (w_motion * motion_score)
 
         return CVResult(
             camera_id=self.config.id,
             motion_score=motion_score,
-            ball_confidence=0.0,
-            ball_bbox=None,
+            ball_confidence=ball_conf,
+            ball_bbox=ball_bbox,
+            score=round(float(composite_score), 4),
         )
 
 

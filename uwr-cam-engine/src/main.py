@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+from .arbiter import SwitchingArbiter
 from .config import EngineConfig, load_config
 from .config_watcher import ConfigWatcher
 from .obs import OBSClientProtocol, ObswsPythonClient
@@ -51,6 +52,9 @@ class EngineSupervisor:
         self.obs_client: OBSClientProtocol = ObswsPythonClient(self.config.obs)
         self.watcher: ConfigWatcher = ConfigWatcher(self.config_path, self.config)
         self.pipeline_mgr: PipelineManager = PipelineManager(self.config.cameras)
+        self.arbiter: SwitchingArbiter = SwitchingArbiter(
+            self.config.switching, self.config.cameras
+        )
         self._running = False
         self._health_task: Optional[asyncio.Task] = None
         self._cv_task: Optional[asyncio.Task] = None
@@ -68,6 +72,9 @@ class EngineSupervisor:
                 self.config.switching.fallback_scene
             ]
             await self.obs_client.verify_scenes(required_scenes)
+            active_scene = await self.obs_client.get_current_scene()
+            if active_scene:
+                self.arbiter.update_current_scene(active_scene)
         else:
             logger.warning(
                 "Initial connection to OBS failed. Background health monitor will attempt reconnection."
@@ -145,13 +152,18 @@ class EngineSupervisor:
             self.pipeline_mgr = PipelineManager(new_cfg.cameras)
             self.pipeline_mgr.start_all()
 
+        # Update arbiter with new switching and camera configs
+        self.arbiter = SwitchingArbiter(
+            new_cfg.switching, new_cfg.cameras, initial_scene=self.arbiter.current_scene
+        )
+
         logger.info(
             f"Configuration reloaded: {len(new_cfg.cameras)} cameras active, "
             f"fallback scene: '{new_cfg.switching.fallback_scene}'."
         )
 
     async def _cv_processing_loop(self) -> None:
-        """Main async loop ticking at ~30 FPS to process CV and report status."""
+        """Main async loop ticking at ~30 FPS to process CV, arbitrate, and report status."""
         loop = asyncio.get_running_loop()
         interval = 1.0 / 30.0  # Target ~30 FPS
         self._last_status_log_time = loop.time()
@@ -159,9 +171,17 @@ class EngineSupervisor:
         while self._running:
             t0 = loop.time()
             try:
-                # Run the CV frame processing in threadpool to avoid blocking event loop
+                # 1. Run the CV frame processing in threadpool to avoid blocking event loop
                 results = await asyncio.to_thread(self.pipeline_mgr.process_tick)
-                
+
+                # 2. Evaluate switching arbitration
+                target_scene = self.arbiter.evaluate(results)
+                if target_scene:
+                    logger.debug(f"Arbiter commanded scene switch to: '{target_scene}'")
+                    success = await self.obs_client.set_scene(target_scene)
+                    if not success:
+                        logger.warning(f"Failed to execute scene switch to '{target_scene}'")
+
                 # Granular debug logging
                 logger.debug(f"CV Tick results: {results}")
 
@@ -171,12 +191,12 @@ class EngineSupervisor:
                 if now - self._last_status_log_time >= status_interval:
                     self._last_status_log_time = now
                     summary_parts = [
-                        f"{cam_id}: [motion={res.motion_score:.2f}]"
+                        f"{cam_id}: [score={res.score:.2f}, motion={res.motion_score:.2f}, ball={res.ball_confidence:.2f}]"
                         for cam_id, res in results.items()
                     ]
-                    active_scene = await self.obs_client.get_current_scene() or "unknown"
+                    active_scene = self.arbiter.current_scene
                     logger.info(
-                        f"[Status] Active Scene: '{active_scene}' | CV Scores: "
+                        f"[Status] Active: '{active_scene}' | Cameras: "
                         + ", ".join(summary_parts)
                     )
 

@@ -19,6 +19,50 @@ class MotionDetectorProtocol(Protocol):
         ...
 
 
+class BallDetectorProtocol(Protocol):
+    """Protocol for interchangeable ball detection algorithms (e.g. YOLO, CoreML, Color)."""
+
+    def process_frame(
+        self, frame: np.ndarray
+    ) -> Tuple[float, Optional[Tuple[int, int, int, int]]]:
+        """Processes a frame to detect the underwater rugby ball.
+
+        Returns:
+            Tuple[float, Optional[Tuple[int, int, int, int]]]:
+                - Confidence score in range [0.0, 1.0]
+                - Bounding box (x, y, w, h) in pixels, or None if not found
+        """
+        ...
+
+
+class BallDetectorYOLO:
+    """YOLO-based deep learning detector for Underwater Rugby ball tracking.
+
+    Prepared for PyTorch/Ultralytics / CoreML integration on Apple Silicon.
+    Currently acts as an extensible inference stub.
+    """
+
+    def __init__(self, model_path: Optional[str] = None, confidence_threshold: float = 0.4) -> None:
+        self.model_path = model_path
+        self.confidence_threshold = confidence_threshold
+        self._model = None
+        # When actual model weight is provided:
+        # if self.model_path and Path(self.model_path).exists():
+        #     from ultralytics import YOLO
+        #     self._model = YOLO(self.model_path)
+
+    def process_frame(
+        self, frame: np.ndarray
+    ) -> Tuple[float, Optional[Tuple[int, int, int, int]]]:
+        if frame is None or frame.size == 0:
+            return 0.0, None
+
+        # When YOLO model is loaded:
+        # results = self._model(frame, device="mps") ...
+        # For now, return default baseline confidence
+        return 0.0, None
+
+
 class MotionDetectorMOG2:
     """Adaptive Background Subtraction motion detector using OpenCV's MOG2.
 

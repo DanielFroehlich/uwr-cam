@@ -200,7 +200,10 @@ The project also includes a dedicated **Camera Simulator Tool (`cam-sim`)** that
    - Multi-camera pipeline manager with future-proof `CVResult` data contract prepared for Phase 4 ball detection.
    - Multi-tier logging: detailed per-frame DEBUG tracing and periodic aggregated status summaries at INFO level (configurable via `status_interval_sec`).
    - Validated against live `cam-sim` dual-resolution RTSP streams and OBS Studio.
-4. **Phase 4: Ball Detection & Scoring Engine [NEXT]**:
-   - Ingest training MP4 footage from user.
-   - Evaluate and integrate ball detector (e.g., color/contour segmentation or lightweight YOLO model).
-   - Implement score aggregation and switching arbitration (dwell time / hysteresis).
+4. **Phase 4: Ball Detection & Scoring Engine [COMPLETED]**:
+   - Training dataset frame extraction utility (`scripts/extract_frames.py`) for sampling MP4 video feeds into JPEG datasets for YOLO/Roboflow annotation.
+   - Ball detection engine abstraction (`BallDetectorProtocol` and `BallDetectorYOLO` inference stub).
+   - Composite scoring calculation ($S_i = w_{\text{ball}} \cdot B_i + w_{\text{motion}} \cdot M_i$) integrated into `PipelineManager`.
+   - Intelligent switching arbitration state machine (`SwitchingArbiter`) enforcing minimum dwell time (anti-flapping), hysteresis margin against current camera, fallback timeout, and manual override.
+   - Fully automated end-to-end switching empirically verified against live `cam-sim` dual-resolution feeds and OBS Studio.
+   - Test suite expanded to 43 automated tests (100% passing).

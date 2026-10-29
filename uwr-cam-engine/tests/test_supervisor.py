@@ -26,6 +26,8 @@ def mock_supervisor(tmp_path, mocker):
     mock_obs.connect = AsyncMock(return_value=True)
     mock_obs.disconnect = AsyncMock()
     mock_obs.verify_scenes = AsyncMock(return_value=(True, []))
+    mock_obs.get_current_scene = AsyncMock(return_value="base")
+    mock_obs.set_scene = AsyncMock(return_value=True)
     mock_obs.is_connected = True
     mocker.patch("src.main.ObswsPythonClient", return_value=mock_obs)
 
@@ -79,6 +81,8 @@ async def test_supervisor_on_config_reload_obs_change(mock_supervisor, mocker):
     mock_new_obs.connect = AsyncMock(return_value=True)
     mock_new_obs.disconnect = AsyncMock()
     mock_new_obs.verify_scenes = AsyncMock(return_value=(True, []))
+    mock_new_obs.get_current_scene = AsyncMock(return_value="base")
+    mock_new_obs.set_scene = AsyncMock(return_value=True)
     mock_new_obs.is_connected = True
     mocker.patch("src.main.ObswsPythonClient", return_value=mock_new_obs)
 

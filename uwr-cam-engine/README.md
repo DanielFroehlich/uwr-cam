@@ -12,14 +12,12 @@
 
 It connects to **OBS Studio** via WebSocket v5 RPC to dynamically switch broadcast scenes based on real-time computer vision analysis.
 
-### Phase 3 Status: Completed ✅
-- **Low-Latency Video Ingestion (`FrameGrabber`)**: Dedicated background thread per camera calling `cap.grab()` in an I/O-paced loop. Discards old buffered frames so the CV pipeline always operates on the zero-latency latest frame (FR-1.4). Includes automatic RTSP stream reconnection.
-- **Adaptive Motion Density Detection (`MotionDetectorMOG2`)**: Uses OpenCV's MOG2 background subtractor to learn continuous water ripples as background and extract foreground masks corresponding to active player scrums (FR-2.2). Modularly decoupled via `MotionDetectorProtocol`.
-- **Multi-Camera Orchestration (`PipelineManager`)**: Manages 2 to 6 camera pipelines concurrently, outputting a typed `CVResult` data contract prepared with ball detection placeholders for Phase 4.
-- **Multi-Level Observability**: Granular per-frame debug tracing (`DEBUG`) and clean periodic status summaries (`INFO`) emitted every `status_interval_sec` seconds.
-- **Dynamic YAML Configuration (`config.yaml`) & Hot-Reloading (`ConfigWatcher`)**: Pydantic schema validation and debounced file watcher that updates parameters without restarting the broadcast.
-- **Decoupled OBS WebSocket v5 Client (`ObswsPythonClient`)**: Non-blocking thread delegation via `asyncio.to_thread()`, auto-reconnect, and scene verification.
-- **Native Apple Silicon Architecture**: Native `.venv` execution unlocking MPS GPU acceleration and VideoToolbox hardware decoding.
+### System Status: All Core Phases Complete ✅
+- **Phase 1 (`cam-sim`)**: Multi-camera RTSP simulator streaming dual-resolution feeds in an endless loop via embedded MediaMTX and FFmpeg.
+- **Phase 2 (`uwr-cam-engine` Config & OBS)**: Dynamic YAML configuration with Pydantic validation, debounced hot-reloading (`ConfigWatcher`), and decoupled OBS WebSocket v5 controller (`ObswsPythonClient`).
+- **Phase 3 (Video Ingestion & Motion Detection)**: Dedicated threaded `FrameGrabber` with zero-latency frame dropping and `MotionDetectorMOG2` adaptive background subtraction filtering water ripples.
+- **Phase 4 (Ball Detection & Switching Arbitration)**: Dataset extraction utility (`scripts/extract_frames.py`), `BallDetectorYOLO` deep learning stub, composite camera scoring ($S = w_{\text{ball}} \cdot B + w_{\text{motion}} \cdot M$), and `SwitchingArbiter` state machine with dwell time, hysteresis, fallback, and manual override.
+- **Automated Test Suite**: 43 unit tests across all modules (100% passing in ~0.65s).
 
 ---
 

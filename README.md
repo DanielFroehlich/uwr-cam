@@ -75,8 +75,9 @@ The system ingests video feeds from multiple IP cameras (2 to 6 cameras), analyz
 | Component | Directory | Status | Description |
 | :--- | :--- | :--- | :--- |
 | **`cam-sim`** | [`cam-sim/`](cam-sim/) | **Completed** | Multi-camera RTSP simulator reading MP4 match files and streaming dual-resolution feeds in an endless loop via embedded MediaMTX and FFmpeg. |
-| **`uwr-cam-engine`** | [`uwr-cam-engine/`](uwr-cam-engine/) | **Phase 3 Complete** | Central computer vision detection engine, dynamic configuration hot-reloader, RTSP frame grabber, and OBS WebSocket v5 controller. |
+| **`uwr-cam-engine`** | [`uwr-cam-engine/`](uwr-cam-engine/) | **Completed** | Central computer vision detection engine, dynamic configuration hot-reloader, RTSP frame grabber, composite scoring, and OBS WebSocket v5 controller. |
 | **Specifications** | [`REQUIREMENTS.md`](REQUIREMENTS.md) | **Active** | System specification, architectural decisions, and functional requirements. |
+| **Design Decisions** | [`docs/`](docs/) | **Active** | Detailed architectural design documents for [Phase 1](docs/phase1.md), [Phase 2](docs/phase2.md), [Phase 3](docs/phase3.md), and [Phase 4](docs/phase4.md). |
 
 ---
 

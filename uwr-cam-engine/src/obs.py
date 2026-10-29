@@ -194,7 +194,7 @@ class ObswsPythonClient:
         assert self._client is not None
         try:
             await asyncio.to_thread(self._sync_set_scene, self._client, scene_name)
-            logger.info(f"OBS Program scene switched to: '{scene_name}'")
+            logger.debug(f"OBS Program scene switched to: '{scene_name}'")
             return True
         except OBSSDKRequestError as e:
             logger.error(f"OBS rejected scene switch to '{scene_name}': {e}")
