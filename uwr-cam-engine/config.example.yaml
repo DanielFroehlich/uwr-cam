@@ -19,6 +19,10 @@ switching:
   hysteresis_threshold: 0.15       # Delta score required to switch away from current camera
   fallback_timeout_sec: 5.0        # Seconds of inactivity before reverting to fallback scene
   manual_override: false           # Pause automated switching for director control
+  scene_poll_interval_sec: 0.5     # Interval in seconds to poll OBS active scene for director manual overrides
+  default_weights:                 # Default scoring weights if not specified per camera
+    ball: 0.7
+    motion: 0.3
 
 # Logging configuration
 logging:
@@ -34,28 +38,39 @@ ball_detector:
     - "underwater ball"
     - "white ball"
 
+# Real-time technical metrics overlay in OBS
+overlay:
+  enabled: false                   # Enable text overlay on broadcast
+  source_name: "CV_Scores_Overlay" # Name of OBS text source
+  update_interval_sec: 1.0         # Update frequency in seconds
+  font_face: "Helvetica"
+  font_size: 36
+  font_style: "Bold"
+  outline: true
+  drop_shadow: true
+
+# Real-time ball tracking marker overlay in OBS
+marker:
+  enabled: false                   # Enable dynamic ball tracking bounding box
+  source_name: "Ball_Marker"       # Name of OBS marker image source
+  update_interval_sec: 0.1         # Update frequency in seconds
+  border_color: [0, 255, 0]        # RGB color (Neon Green)
+  border_thickness: 4              # Border width in pixels
+
 # Camera inputs and OBS scene mappings (2 to 6 cameras)
+# Note: 'weights' (ball, motion) is optional per camera and defaults to switching.default_weights
 cameras:
   - id: "cam1"
     name: "Underwater Goal Left"
     rtsp_url: "rtsp://localhost:8554/cam1/low"
     obs_scene: "cam1"
-    weights:
-      ball: 0.7
-      motion: 0.3
 
   - id: "cam2"
     name: "Underwater Goal Right"
     rtsp_url: "rtsp://localhost:8554/cam2/low"
     obs_scene: "cam2"
-    weights:
-      ball: 0.7
-      motion: 0.3
 
   - id: "cam3"
     name: "Surface Center Overview"
     rtsp_url: "rtsp://localhost:8554/cam3/low"
     obs_scene: "cam3"
-    weights:
-      ball: 0.7
-      motion: 0.3

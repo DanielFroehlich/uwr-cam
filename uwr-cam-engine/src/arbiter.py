@@ -36,15 +36,54 @@ class SwitchingArbiter:
         self.inactivity_threshold = inactivity_threshold
 
         self.current_scene: str = initial_scene or self.fallback_scene
+        self.previous_scene: str = self.current_scene
         self.last_switch_time: float = time.time()
         self.last_activity_time: float = time.time()
 
-    def update_current_scene(self, scene_name: str) -> None:
+    @property
+    def auto_scenes(self) -> set[str]:
+        """Set of all OBS scene names managed by automated switching (camera scenes + fallback)."""
+        scenes = set(self.scene_to_cam.keys())
+        if self.fallback_scene:
+            scenes.add(self.fallback_scene)
+        return scenes
+
+    def is_auto_scene(self, scene_name: Optional[str]) -> bool:
+        """Return True if scene_name is one of the configured automated scenes."""
+        if not scene_name:
+            return False
+        return scene_name in self.auto_scenes
+
+    @property
+    def is_manual_override(self) -> bool:
+        """Return True if manual override is active (via config or manual OBS scene)."""
+        return self.config.manual_override or not self.is_auto_scene(self.current_scene)
+
+    def update_current_scene(self, scene_name: str, now: Optional[float] = None) -> None:
         """Synchronizes arbiter state with actual active program scene from OBS."""
+        current_time = now if now is not None else time.time()
         if self.current_scene != scene_name:
-            logger.debug(f"Arbiter scene state updated: '{self.current_scene}' -> '{scene_name}'")
+            was_auto = self.is_auto_scene(self.current_scene)
+            is_auto = self.is_auto_scene(scene_name)
+
+            if was_auto and not is_auto:
+                logger.info(
+                    f"Director manual override engaged: OBS scene changed to manual scene '{scene_name}'. "
+                    "Automated switching suspended."
+                )
+            elif not was_auto and is_auto:
+                logger.info(
+                    f"Director manual override released: OBS scene changed to auto scene '{scene_name}'. "
+                    "Automated switching resumed."
+                )
+            else:
+                logger.debug(f"Arbiter scene state updated: '{self.current_scene}' -> '{scene_name}'")
+
             self.current_scene = scene_name
-            self.last_switch_time = time.time()
+            self.last_switch_time = current_time
+            self.last_activity_time = current_time
+
+        self.previous_scene = scene_name
 
     def evaluate(self, results: Dict[str, CVResult], now: Optional[float] = None) -> Optional[str]:
         """Evaluates current camera scores and returns target scene if a switch is required.
@@ -58,9 +97,16 @@ class SwitchingArbiter:
         """
         current_time = now if now is not None else time.time()
 
-        # Rule 1: Manual override active -> do not switch
+        # Rule 1: Manual override active via configuration -> do not switch
         if self.config.manual_override:
-            logger.debug("Manual override active. Skipping automated switching.")
+            logger.debug("Manual override active via configuration. Skipping automated switching.")
+            return None
+
+        # Rule 1b: Manual scene active in OBS (human director override) -> do not switch
+        if not self.is_auto_scene(self.current_scene):
+            logger.debug(
+                f"Manual scene '{self.current_scene}' active in OBS. Skipping automated switching."
+            )
             return None
 
         # Rule 2: Check for any activity across all cameras
@@ -92,6 +138,7 @@ class SwitchingArbiter:
                     f"No activity detected for {time_since_activity:.1f}s (timeout: {self.config.fallback_timeout_sec}s). "
                     f"Reverting to fallback scene: '{self.fallback_scene}'"
                 )
+                self.previous_scene = self.current_scene
                 self.current_scene = self.fallback_scene
                 self.last_switch_time = current_time
                 return self.fallback_scene
@@ -123,6 +170,7 @@ class SwitchingArbiter:
                 f"score {max_score:.2f} exceeds required {required_score:.2f} "
                 f"(current '{self.current_scene}' score: {current_score:.2f}, margin: {self.config.hysteresis_threshold})"
             )
+            self.previous_scene = self.current_scene
             self.current_scene = target_scene
             self.last_switch_time = current_time
             return target_scene

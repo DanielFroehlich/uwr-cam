@@ -103,3 +103,50 @@ async def test_watcher_add_remove_callback(tmp_path):
 
     watcher.remove_callback(cb)
     assert cb not in watcher._callbacks
+
+
+@pytest.mark.asyncio
+async def test_watcher_retains_old_config_when_callback_fails(tmp_path):
+    config_file = tmp_path / "config.yaml"
+    initial_data = sample_valid_config_dict()
+    config_file.write_text(yaml.dump(initial_data), encoding="utf-8")
+
+    cfg = load_config(config_file)
+    watcher = ConfigWatcher(
+        config_path=config_file,
+        current_config=cfg,
+        poll_interval_sec=0.05,
+        debounce_sec=0.02,
+    )
+
+    should_fail = True
+
+    def failing_callback(old, new):
+        if should_fail:
+            raise ValueError("Missing required OBS scenes: ['cam4']")
+
+    watcher.add_callback(failing_callback)
+    await watcher.start()
+
+    try:
+        # Update dwell time in file
+        updated_data = sample_valid_config_dict()
+        updated_data["switching"]["min_dwell_time_sec"] = 4.5
+        config_file.write_text(yaml.dump(updated_data), encoding="utf-8")
+
+        await asyncio.sleep(0.2)
+
+        # Because callback failed, watcher must retain old config
+        assert watcher.current_config.switching.min_dwell_time_sec == 2.0
+
+        # Now allow callback to succeed
+        should_fail = False
+        updated_data["switching"]["min_dwell_time_sec"] = 5.0
+        config_file.write_text(yaml.dump(updated_data), encoding="utf-8")
+
+        await asyncio.sleep(0.2)
+
+        # New configuration should now be applied
+        assert watcher.current_config.switching.min_dwell_time_sec == 5.0
+    finally:
+        await watcher.stop()

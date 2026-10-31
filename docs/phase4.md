@@ -43,7 +43,9 @@ The objectives were:
 
 ### 2.4. Switching Arbiter State Machine (`SwitchingArbiter`)
 - **Decision**: Implement a decoupled state machine enforcing broadcast switching rules:
-  1. **Manual Override (FR-3.3)**: If `manual_override: true`, all automated switching commands are suppressed, granting the human broadcast director sole control in OBS.
+  1. **Manual Override (FR-3.3)**:
+     - **Config Flag**: If `manual_override: true`, all automated switching commands are suppressed.
+     - **Director Scene Override**: If the currently active OBS program scene is not one of the configured camera feeds or fallback scene (e.g. replay, interview, commentary), automated switching is suspended. Automated switching automatically resumes with dwell time enforcement as soon as the director selects any auto-managed scene.
   2. **Anti-Flapping Dwell Time (FR-3.1)**: If `time - last_switch_time < min_dwell_time_sec` (e.g., 2.5s), hold the current camera regardless of score changes. This prevents rapid toggling that causes viewer fatigue.
   3. **Hysteresis Margin (FR-3.1)**: A candidate camera $C_{\text{max}}$ must exceed the *currently active camera's score* by at least `hysteresis_threshold` (e.g., $+0.15$):
      $$S_{\text{max}} > S_{\text{current}} + \Delta_{\text{hysteresis}}$$

@@ -10,6 +10,10 @@ import yaml
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
+class ConfigurationError(ValueError):
+    """Raised when configuration validation or environment verification fails."""
+
+
 class OBSConfig(BaseModel):
     """OBS Studio WebSocket v5 connection settings."""
     host: str = Field(default="localhost", description="OBS WebSocket host IP or hostname")
@@ -38,7 +42,7 @@ class CameraConfig(BaseModel):
     name: str = Field(..., description="Human-readable camera description")
     rtsp_url: str = Field(..., description="RTSP URL for low-res computer vision stream")
     obs_scene: str = Field(..., min_length=1, description="Mapped OBS Studio program scene name")
-    weights: CameraWeights = Field(default_factory=CameraWeights, description="Scoring weights")
+    weights: Optional[CameraWeights] = Field(default=None, description="Scoring weights")
 
     @field_validator("id")
     @classmethod
@@ -89,6 +93,47 @@ class SwitchingConfig(BaseModel):
         default=False,
         description="Pause automated switching to allow director manual control"
     )
+    scene_poll_interval_sec: float = Field(
+        default=0.5,
+        ge=0.1,
+        le=10.0,
+        description="Interval in seconds to poll OBS for active program scene changes"
+    )
+    default_weights: CameraWeights = Field(
+        default_factory=CameraWeights,
+        description="Default scoring weights for cameras without dedicated weights"
+    )
+
+
+class MarkerConfig(BaseModel):
+    """Configuration for real-time bounding box ball marker overlay in OBS."""
+    enabled: bool = Field(default=False, description="Enable ball marker bounding box overlay")
+    source_name: str = Field(default="Ball_Marker", min_length=1, description="Name of the OBS marker image source")
+    update_interval_sec: float = Field(
+        default=0.1,
+        ge=0.033,
+        le=5.0,
+        description="Interval in seconds between marker transform updates"
+    )
+    border_color: List[int] = Field(default=[0, 255, 0], description="RGB border color")
+    border_thickness: int = Field(default=4, ge=1, le=32, description="Marker border thickness in pixels")
+
+
+class OverlayConfig(BaseModel):
+    """Configuration for live on-screen text overlay in OBS."""
+    enabled: bool = Field(default=False, description="Enable real-time technical metrics overlay in OBS")
+    source_name: str = Field(default="CV_Scores_Overlay", min_length=1, description="Name of the text source in OBS")
+    update_interval_sec: float = Field(
+        default=1.0,
+        ge=0.1,
+        le=10.0,
+        description="Interval in seconds between overlay text updates"
+    )
+    font_face: str = Field(default="Helvetica", description="Font family name")
+    font_size: int = Field(default=36, ge=8, le=256, description="Font point size")
+    font_style: str = Field(default="Bold", description="Font style (e.g. Regular, Bold)")
+    outline: bool = Field(default=True, description="Enable text outline for visibility")
+    drop_shadow: bool = Field(default=True, description="Enable drop shadow for visibility")
 
 
 class LoggingConfig(BaseModel):
@@ -139,6 +184,14 @@ class EngineConfig(BaseModel):
         default_factory=BallDetectorConfig,
         description="YOLO ball detector settings",
     )
+    overlay: OverlayConfig = Field(
+        default_factory=OverlayConfig,
+        description="OBS text overlay settings",
+    )
+    marker: MarkerConfig = Field(
+        default_factory=MarkerConfig,
+        description="OBS ball marker overlay settings",
+    )
     cameras: List[CameraConfig] = Field(
         ...,
         min_length=2,
@@ -148,6 +201,11 @@ class EngineConfig(BaseModel):
 
     @model_validator(mode="after")
     def validate_global_invariants(self) -> EngineConfig:
+        # 0. Populate default weights for cameras without dedicated weights
+        for c in self.cameras:
+            if c.weights is None:
+                c.weights = self.switching.default_weights.model_copy()
+
         # 1. Unique camera IDs
         ids = [c.id for c in self.cameras]
         if len(ids) != len(set(ids)):

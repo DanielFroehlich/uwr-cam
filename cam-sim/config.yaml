@@ -19,7 +19,7 @@ defaults:
 cameras:
   - id: "cam1"
     name: "Underwater Goal Left"
-    source: "/videos/goal_left.mp4"
+    source: "/videos/cam1.mp4"
     feeds:
       low_res:
         enabled: true
@@ -37,8 +37,8 @@ cameras:
         bitrate: "6000k"
 
   - id: "cam2"
-    name: "Underwater Goal Right"
-    source: "/videos/goal_right.mp4"
+    name: "Underwater Center"
+    source: "/videos/cam2.mp4"
     feeds:
       low_res:
         enabled: true
@@ -56,8 +56,8 @@ cameras:
         bitrate: "6000k"
 
   - id: "cam3"
-    name: "Surface Center Overview"
-    source: "/videos/center_overview.mp4"
+    name: "Underwater Goal Right"
+    source: "/videos/cam3.mp4"
     feeds:
       low_res:
         enabled: true

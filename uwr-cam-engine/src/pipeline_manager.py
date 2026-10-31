@@ -8,7 +8,7 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
-from .config import BallDetectorConfig, CameraConfig
+from .config import BallDetectorConfig, CameraConfig, CameraWeights
 from .cv_pipeline import (
     BallDetectorProtocol,
     BallDetectorYOLO,
@@ -28,6 +28,8 @@ class CVResult:
     ball_confidence: float = 0.0       # Phase 4: Ball detection confidence [0.0, 1.0]
     ball_bbox: Optional[Tuple[int, int, int, int]] = None  # (x, y, w, h)
     score: float = 0.0                 # Phase 4: Composite score = (w_ball * B) + (w_motion * M)
+    frame_width: int = 640
+    frame_height: int = 360
 
 
 class CameraPipeline:
@@ -64,8 +66,9 @@ class CameraPipeline:
         if is_ball_enabled:
             ball_conf, ball_bbox = self.ball_detector.process_frame(frame)
             # Calculate composite camera score: S = (w_ball * B) + (w_motion * M)
-            w_ball = self.config.weights.ball
-            w_motion = self.config.weights.motion
+            weights = self.config.weights or CameraWeights()
+            w_ball = weights.ball
+            w_motion = weights.motion
             composite_score = (w_ball * ball_conf) + (w_motion * motion_score)
         else:
             # Ball detector disabled: motion receives 100% weight
@@ -73,12 +76,15 @@ class CameraPipeline:
             ball_bbox = None
             composite_score = motion_score
 
+        fh, fw = frame.shape[:2]
         return CVResult(
             camera_id=self.config.id,
             motion_score=motion_score,
             ball_confidence=ball_conf,
             ball_bbox=ball_bbox,
             score=round(float(composite_score), 4),
+            frame_width=fw,
+            frame_height=fh,
         )
 
 

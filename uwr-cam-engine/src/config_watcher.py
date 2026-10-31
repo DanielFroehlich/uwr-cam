@@ -103,7 +103,6 @@ class ConfigWatcher:
             return
 
         old_config = self.current_config
-        self.current_config = new_config
         logger.info("New configuration validated successfully. Applying runtime updates...")
 
         # Dispatch callbacks
@@ -113,4 +112,8 @@ class ConfigWatcher:
                 if asyncio.iscoroutine(result):
                     await result
             except Exception as e:
-                logger.error(f"Error executing config update callback {cb}: {e}", exc_info=True)
+                logger.error(f"Hot-reload rejected: Error applying configuration: {e}. Keeping current active configuration.")
+                return
+
+        self.current_config = new_config
+        logger.info("New configuration applied successfully.")

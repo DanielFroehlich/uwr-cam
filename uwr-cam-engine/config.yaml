@@ -14,11 +14,15 @@ obs:
 
 # Switching and arbitration parameters
 switching:
-  fallback_scene: "base"           # Default overview scene if no high-confidence tracking
+  fallback_scene: "auto-base"           # Default overview scene if no high-confidence tracking
   min_dwell_time_sec: 3.0          # Minimum seconds to stay on a scene (anti-flapping)
   hysteresis_threshold: 0.10       # Delta score required to switch away from current camera
   fallback_timeout_sec: 5.0        # Seconds of inactivity before reverting to fallback scene
   manual_override: false           # Pause automated switching for director control
+  scene_poll_interval_sec: 0.5     # Interval in seconds to poll OBS active scene for director manual overrides
+  default_weights:
+    ball: 0.5
+    motion: 0.5
 
 # Logging configuration
 logging:
@@ -29,33 +33,45 @@ logging:
 ball_detector:
   enabled: true                    # Enable deep-learning ball detection
   model_name: "yolov8s-worldv2.pt" # Pre-trained YOLO-World open-vocabulary model
-  confidence_threshold: 0.25       # Minimum confidence to score a ball detection
+  confidence_threshold: 0.60       # Minimum confidence to score a ball detection
   classes:
-    - "underwater ball"
-    - "white ball"
+#    - "underwater ball"
+#    - "white ball"
+    - "yellow ball"
+#   - "red ball"
+
+# Real-time technical metrics overlay in OBS
+overlay:
+  enabled: true                    # Enable live metrics overlay
+  source_name: "CV_Scores_Overlay" # Name of OBS text source
+  update_interval_sec: 0.5         # Update frequency in seconds
+  font_face: "Helvetica"
+  font_size: 36
+  font_style: "Bold"
+  outline: true
+  drop_shadow: true
+
+# Real-time ball tracking marker overlay in OBS
+marker:
+  enabled: true                    # Enable dynamic ball tracking bounding box
+  source_name: "Ball_Marker"       # Name of OBS marker image source
+  update_interval_sec: 0.1         # Update frequency in seconds
+  border_color: [255, 0, 255]      # RGB color (Neon Green)
+  border_thickness: 8              # Border width in pixels
 
 # Camera inputs and OBS scene mappings (2 to 6 cameras)
 cameras:
   - id: "cam1"
     name: "Underwater Goal Left"
     rtsp_url: "rtsp://localhost:8554/cam1/low"
-    obs_scene: "cam1"
-    weights:
-      ball: 0.5
-      motion: 0.5
+    obs_scene: "auto-cam1"
 
   - id: "cam2"
-    name: "Underwater Goal Right"
+    name: "Underwater Center"
     rtsp_url: "rtsp://localhost:8554/cam2/low"
-    obs_scene: "cam2"
-    weights:
-      ball: 0.5
-      motion: 0.5
+    obs_scene: "auto-cam2"
 
   - id: "cam3"
-    name: "Surface Center Overview"
+    name: "Underwater Goal Right"
     rtsp_url: "rtsp://localhost:8554/cam3/low"
-    obs_scene: "cam3"
-    weights:
-      ball: 0.5
-      motion: 0.5
+    obs_scene: "auto-cam3"

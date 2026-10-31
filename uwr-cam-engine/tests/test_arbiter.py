@@ -139,3 +139,80 @@ def test_arbiter_manual_override_suppresses_switching(sample_switching_config, s
     target = arbiter.evaluate(results, now=t0)
     assert target is None
     assert arbiter.current_scene == "base"
+
+
+def test_arbiter_auto_scenes_and_manual_scene_identification(sample_switching_config, sample_cameras):
+    arbiter = SwitchingArbiter(sample_switching_config, sample_cameras, initial_scene="base")
+    assert arbiter.auto_scenes == {"base", "cam1", "cam2"}
+    assert arbiter.is_auto_scene("base") is True
+    assert arbiter.is_auto_scene("cam1") is True
+    assert arbiter.is_auto_scene("cam2") is True
+    assert arbiter.is_auto_scene("interview") is False
+    assert arbiter.is_auto_scene("replay") is False
+    assert arbiter.is_auto_scene(None) is False
+
+
+def test_arbiter_is_manual_override_property(sample_switching_config, sample_cameras):
+    arbiter = SwitchingArbiter(sample_switching_config, sample_cameras, initial_scene="cam1")
+    assert arbiter.is_manual_override is False
+
+    # Switch to manual scene
+    arbiter.update_current_scene("replay")
+    assert arbiter.is_manual_override is True
+
+    # Switch back to auto scene
+    arbiter.update_current_scene("cam2")
+    assert arbiter.is_manual_override is False
+
+    # Config-level manual override
+    arbiter.config.manual_override = True
+    assert arbiter.is_manual_override is True
+
+
+def test_arbiter_unmanaged_scene_suppresses_automated_switching(sample_switching_config, sample_cameras):
+    arbiter = SwitchingArbiter(sample_switching_config, sample_cameras, initial_scene="cam1")
+    t0 = 100.0
+    arbiter.last_switch_time = t0 - 10.0
+
+    # Director manually selects "interview" in OBS
+    arbiter.update_current_scene("interview", now=t0)
+    assert arbiter.current_scene == "interview"
+    assert arbiter.previous_scene == "interview"
+
+    # Even with dominant activity on cam2, arbiter must NOT switch away from manual scene
+    results = {
+        "cam1": CVResult(camera_id="cam1", score=0.1),
+        "cam2": CVResult(camera_id="cam2", score=0.95),
+    }
+    target = arbiter.evaluate(results, now=t0 + 5.0)
+    assert target is None
+    assert arbiter.current_scene == "interview"
+
+
+def test_arbiter_resumes_switching_when_director_selects_auto_scene(sample_switching_config, sample_cameras):
+    arbiter = SwitchingArbiter(sample_switching_config, sample_cameras, initial_scene="interview")
+    t0 = 100.0
+
+    # Arbiter starts on manual scene "interview" -> evaluate does nothing
+    results = {
+        "cam1": CVResult(camera_id="cam1", score=0.3),
+        "cam2": CVResult(camera_id="cam2", score=0.8),
+    }
+    assert arbiter.evaluate(results, now=t0) is None
+
+    # Director switches back to "cam1" in OBS at t0 + 10.0
+    t1 = t0 + 10.0
+    arbiter.update_current_scene("cam1", now=t1)
+    assert arbiter.current_scene == "cam1"
+    assert arbiter.last_switch_time == t1
+
+    # Dwell time (2.0s) active on cam1: at t1 + 1.0s, cannot switch yet
+    assert arbiter.evaluate(results, now=t1 + 1.0) is None
+    assert arbiter.current_scene == "cam1"
+
+    # After dwell time expires at t1 + 2.5s: cam2 (0.8) beats cam1 (0.3) -> SWITCH
+    target = arbiter.evaluate(results, now=t1 + 2.5)
+    assert target == "cam2"
+    assert arbiter.current_scene == "cam2"
+    assert arbiter.previous_scene == "cam1"
+

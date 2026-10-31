@@ -135,15 +135,18 @@ class BallDetectorYOLO:
             if len(boxes) == 0:
                 return 0.0, None
 
-            # Find the detection with the highest confidence
+            # Find the detection with the highest confidence meeting threshold
             best_conf = 0.0
             best_bbox = None
             for box in boxes:
                 conf = float(box.conf[0].item())
-                if conf > best_conf:
+                if conf >= self.confidence_threshold and conf > best_conf:
                     best_conf = conf
                     xywh = [int(v) for v in box.xywh[0].tolist()]
                     best_bbox = (xywh[0], xywh[1], xywh[2], xywh[3])
+
+            if best_conf < self.confidence_threshold:
+                return 0.0, None
 
             return best_conf, best_bbox
 
