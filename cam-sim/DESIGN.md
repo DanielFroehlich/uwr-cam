@@ -105,6 +105,14 @@ Given a set of input MP4 video recordings, `cam-sim` simulates **2 to 6 IP camer
   - **Development Mode (`["tcp"]`)**: Recommended when running in Podman on macOS. Avoids macOS hypervisor UDP NAT routing issues and prevents video players (VLC, etc.) from hitting 10-second UDP retry timeouts.
   - **Production Mode (`["udp"]` or `["tcp", "udp"]`)**: Dedicated wired Ethernet cable network on the pool deck. RTP over UDP eliminates TCP retransmission buffers and head-of-line blocking, which is mandatory to guarantee the strict **<100ms end-to-end latency** requirement.
 
+#### 3.6. Dynamic Runtime Configuration Hot-Reloading
+- **Decision**: Automatically monitor `config.yaml` for modifications at runtime within the Supervisor health loop.
+- **Rationale**:
+  - Eliminates the need to restart the container or process when adjusting stream bitrates, camera sources, resolutions, or adding/removing cameras.
+  - **Surgical Restarts**: If only a single camera's settings change, only that specific camera's FFmpeg pipeline worker is stopped and restarted; other streams continue uninterrupted.
+  - **Fault Tolerance**: If an edited YAML file is corrupted or fails schema validation, the error is logged and the active configuration is retained without interrupting active streams.
+  - **Server/Defaults Changes**: If server settings (`rtsp_port`, `bind_address`, `rtsp_transports`) or global encoding defaults change, all workers and MediaMTX are restarted cleanly.
+
 ---
 
 ### 4. Configuration Schema (`cam-sim/config.yaml`)

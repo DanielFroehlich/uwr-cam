@@ -76,6 +76,7 @@ def main() -> None:
         sys.exit(1)
 
     supervisor = Supervisor(
+        config_path=args.config_path,
         config=config,
         mediamtx_bin=args.mediamtx_bin,
         ffmpeg_bin=args.ffmpeg_bin,

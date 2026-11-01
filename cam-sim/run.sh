@@ -48,6 +48,7 @@ cmd_start() {
         -p 8000-8005:8000-8005/udp \
         -v "${SCRIPT_DIR}/videos:/videos:ro" \
         -v "${SCRIPT_DIR}/config.yaml:/app/config.yaml:ro" \
+        -v "${SCRIPT_DIR}/src:/app/src:ro" \
         "${IMAGE_NAME}"
 
     echo "==> ${CONTAINER_NAME} started successfully."
@@ -68,6 +69,7 @@ cmd_run() {
         -p 8000-8005:8000-8005/udp \
         -v "${SCRIPT_DIR}/videos:/videos:ro" \
         -v "${SCRIPT_DIR}/config.yaml:/app/config.yaml:ro" \
+        -v "${SCRIPT_DIR}/src:/app/src:ro" \
         "${IMAGE_NAME}"
 }
 

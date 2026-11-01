@@ -33,10 +33,10 @@ logging:
 ball_detector:
   enabled: true                    # Enable deep-learning ball detection
   model_name: "yolov8s-worldv2.pt" # Pre-trained YOLO-World open-vocabulary model
-  confidence_threshold: 0.60       # Minimum confidence to score a ball detection
+  confidence_threshold: 0.40       # Minimum confidence to score a ball detection
   classes:
 #    - "underwater ball"
-#    - "white ball"
+    - "white ball"
     - "yellow ball"
 #   - "red ball"
 

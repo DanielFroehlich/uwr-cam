@@ -155,6 +155,12 @@ PYTHONPATH=cam-sim cam-sim/.venv/bin/pytest cam-sim/tests -v
 
 ## 5. Configuration Reference (`cam-sim/config.yaml`)
 
+`cam-sim` supports **dynamic configuration hot-reloading** at runtime. When `config.yaml` is edited:
+- If a camera's resolution, bitrate, fps, or source file is changed, only that camera's FFmpeg worker is restarted; other streams remain live.
+- If cameras are added or removed, only the affected workers are started or stopped.
+- If server port/transports or global defaults change, MediaMTX and all workers restart automatically.
+- If an invalid YAML syntax or schema is saved, the error is logged and the active running configuration is preserved without crashing.
+
 ```yaml
 version: "1.0"
 
