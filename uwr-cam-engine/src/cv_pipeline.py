@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import logging
-from typing import Protocol, Tuple
+import time
+from typing import Optional, Protocol, Tuple
 
 import cv2
 import numpy as np
@@ -62,6 +63,7 @@ class BallDetectorYOLO:
             self.device = "mps" if torch.backends.mps.is_available() else "cpu"
         else:
             self.device = device
+        self.last_inference_time_ms: float = 0.0
 
         self._model = None
         if self.enabled:
@@ -122,15 +124,18 @@ class BallDetectorYOLO:
         self, frame: np.ndarray
     ) -> Tuple[float, Optional[Tuple[int, int, int, int]]]:
         if not self.enabled or self._model is None or frame is None or frame.size == 0:
+            self.last_inference_time_ms = 0.0
             return 0.0, None
 
         try:
+            t0 = time.perf_counter()
             results = self._model(
                 frame,
                 device=self.device,
                 verbose=False,
                 conf=self.confidence_threshold,
             )
+            self.last_inference_time_ms = round((time.perf_counter() - t0) * 1000.0, 2)
             boxes = results[0].boxes
             if len(boxes) == 0:
                 return 0.0, None

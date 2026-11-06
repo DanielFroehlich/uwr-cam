@@ -315,14 +315,31 @@ class EngineSupervisor:
                 status_interval = self.config.logging.status_interval_sec
                 if now - self._last_status_log_time >= status_interval:
                     self._last_status_log_time = now
-                    summary_parts = [
-                        f"{cam_id}: [score={res.score:.2f}, motion={res.motion_score:.2f}, ball={res.ball_confidence:.2f}]"
-                        for cam_id, res in results.items()
-                    ]
+                    summary_parts = []
+                    total_infer_ms = 0.0
+                    infer_count = 0
+                    for cam_id, res in results.items():
+                        lat_part = ""
+                        if self.config.ball_detector.enabled:
+                            try:
+                                lat = float(res.inference_time_ms)
+                                total_infer_ms += lat
+                                infer_count += 1
+                                lat_part = f", infer={lat:.1f}ms"
+                            except (TypeError, ValueError, AttributeError):
+                                pass
+                        summary_parts.append(
+                            f"{cam_id}: [score={res.score:.2f}, motion={res.motion_score:.2f}, ball={res.ball_confidence:.2f}{lat_part}]"
+                        )
                     active_scene = self.arbiter.current_scene
                     override_str = " [MANUAL]" if self.arbiter.is_manual_override else ""
+                    avg_infer_str = (
+                        f" | Model Latency: {total_infer_ms / max(1, infer_count):.1f}ms"
+                        if infer_count > 0 and self.config.ball_detector.enabled
+                        else ""
+                    )
                     logger.info(
-                        f"[Status] Active: '{active_scene}'{override_str} | Cameras: "
+                        f"[Status] Active: '{active_scene}'{override_str}{avg_infer_str} | Cameras: "
                         + ", ".join(summary_parts)
                     )
 
@@ -331,18 +348,37 @@ class EngineSupervisor:
                     overlay_interval = self.config.overlay.update_interval_sec
                     if now - self._last_overlay_update_time >= overlay_interval:
                         self._last_overlay_update_time = now
-                        overlay_lines = [
-                            f"CV SCORES [Active: {self.arbiter.current_scene}]"
-                        ]
+                        total_infer_ms = 0.0
+                        infer_count = 0
+                        cam_lines = []
                         for cam in self.config.cameras:
                             cid = cam.id
                             if cid in results:
                                 res = results[cid]
-                                overlay_lines.append(
-                                    f"{cid.upper()}: {res.score:.2f} [Ball: {res.ball_confidence:.2f}, Motion: {res.motion_score:.2f}]"
+                                lat_str = ""
+                                if self.config.ball_detector.enabled:
+                                    try:
+                                        lat = float(res.inference_time_ms)
+                                        total_infer_ms += lat
+                                        infer_count += 1
+                                        lat_str = f", {lat:.1f}ms"
+                                    except (TypeError, ValueError, AttributeError):
+                                        pass
+                                cam_lines.append(
+                                    f"{cid.upper()}: {res.score:.2f} [Ball: {res.ball_confidence:.2f}, Motion: {res.motion_score:.2f}{lat_str}]"
                                 )
                             else:
-                                overlay_lines.append(f"{cid.upper()}: --")
+                                cam_lines.append(f"{cid.upper()}: --")
+
+                        avg_latency = total_infer_ms / max(1, infer_count) if infer_count > 0 else 0.0
+                        model_hdr = (
+                            f" | Model: {avg_latency:.1f}ms"
+                            if avg_latency > 0 and self.config.ball_detector.enabled
+                            else ""
+                        )
+                        overlay_lines = [
+                            f"CV SCORES [Active: {self.arbiter.current_scene}{model_hdr}]"
+                        ] + cam_lines
 
                         overlay_text = "\n".join(overlay_lines)
                         font_settings = {

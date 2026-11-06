@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
@@ -30,6 +31,7 @@ class CVResult:
     score: float = 0.0                 # Phase 4: Composite score = (w_ball * B) + (w_motion * M)
     frame_width: int = 640
     frame_height: int = 360
+    inference_time_ms: float = 0.0     # Time spent on ball detector model inference in milliseconds
 
 
 class CameraPipeline:
@@ -63,8 +65,11 @@ class CameraPipeline:
 
         # 2. Check if ball detection is enabled on detector
         is_ball_enabled = getattr(self.ball_detector, "enabled", True)
+        inference_time_ms = 0.0
         if is_ball_enabled:
+            t0 = time.perf_counter()
             ball_conf, ball_bbox = self.ball_detector.process_frame(frame)
+            inference_time_ms = (time.perf_counter() - t0) * 1000.0
             # Calculate composite camera score: S = (w_ball * B) + (w_motion * M)
             weights = self.config.weights or CameraWeights()
             w_ball = weights.ball
@@ -85,6 +90,7 @@ class CameraPipeline:
             score=round(float(composite_score), 4),
             frame_width=fw,
             frame_height=fh,
+            inference_time_ms=round(inference_time_ms, 2),
         )
 
 

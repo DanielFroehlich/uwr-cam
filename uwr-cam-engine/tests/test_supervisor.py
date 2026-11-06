@@ -257,6 +257,36 @@ async def test_supervisor_overlay_updates(mock_supervisor):
 
 
 @pytest.mark.asyncio
+async def test_supervisor_overlay_includes_model_latency(mock_supervisor):
+    """Verify that model inference latency is formatted and displayed in CV_Scores_Overlay."""
+    sup, mock_obs, _, mock_pipeline_mgr, _ = mock_supervisor
+
+    sup.config.overlay.enabled = True
+    sup.config.overlay.update_interval_sec = 0.01
+    sup.config.ball_detector.enabled = True
+
+    mock_pipeline_mgr.process_tick.return_value = {
+        "cam1": MagicMock(score=0.88, motion_score=0.30, ball_confidence=0.85, inference_time_ms=12.4),
+        "cam2": MagicMock(score=0.20, motion_score=0.15, ball_confidence=0.00, inference_time_ms=11.6),
+    }
+
+    await sup.start()
+    await asyncio.sleep(0.05)
+
+    assert mock_obs.update_text_overlay.await_count >= 1
+    call_args = mock_obs.update_text_overlay.call_args
+    text_content = call_args[0][1]
+
+    # Overall header latency (average = 12.0ms)
+    assert "Model: 12.0ms" in text_content
+    # Per-camera latency
+    assert "CAM1: 0.88 [Ball: 0.85, Motion: 0.30, 12.4ms]" in text_content
+    assert "CAM2: 0.20 [Ball: 0.00, Motion: 0.15, 11.6ms]" in text_content
+
+    await sup.stop()
+
+
+@pytest.mark.asyncio
 async def test_supervisor_marker_tracking(mock_supervisor):
     sup, mock_obs, _, mock_pipeline_mgr, _ = mock_supervisor
 

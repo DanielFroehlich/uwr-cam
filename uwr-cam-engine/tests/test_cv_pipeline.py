@@ -85,6 +85,7 @@ def test_ball_detector_mocked_inference():
 
     assert conf == 0.85
     assert bbox == (100, 150, 40, 40)
+    assert detector.last_inference_time_ms >= 0.0
 
 
 def test_pipeline_manager_cv_result_contract():
@@ -119,3 +120,32 @@ def test_pipeline_manager_cv_result_contract():
     assert res1.ball_confidence == 0.0
     assert res1.ball_bbox is None
     assert res1.score == 0.0
+    assert res1.inference_time_ms == 0.0
+
+
+def test_camera_pipeline_measures_inference_latency(mocker):
+    """Verify that CameraPipeline measures ball detector latency and includes it in CVResult."""
+    cfg = CameraConfig(
+        id="cam1",
+        name="Camera 1",
+        rtsp_url="rtsp://localhost:8554/cam1/low",
+        obs_scene="cam1",
+        weights=CameraWeights(ball=0.7, motion=0.3),
+    )
+    mock_detector = MagicMock()
+    mock_detector.enabled = True
+    mock_detector.process_frame.return_value = (0.9, (10, 20, 30, 40))
+
+    from src.pipeline_manager import CameraPipeline
+
+    pipe = CameraPipeline(cfg, ball_detector=mock_detector)
+    # Mock grabber returning a frame
+    dummy_frame = np.zeros((360, 640, 3), dtype=np.uint8)
+    mocker.patch.object(pipe.grabber, "read_latest", return_value=(True, dummy_frame))
+
+    result = pipe.process_latest()
+
+    assert result.camera_id == "cam1"
+    assert result.ball_confidence == 0.9
+    assert result.inference_time_ms >= 0.0
+    assert mock_detector.process_frame.called

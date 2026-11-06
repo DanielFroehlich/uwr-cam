@@ -30,21 +30,27 @@ logging:
   status_interval_sec: 2.0         # Seconds between periodic CV status summaries
 
 # Ball detection engine configuration
+# yolo world model;:
+#ball_detector:
+#  enabled: true                    # Enable deep-learning ball detection
+#  model_name: "yolov8s-worldv2.pt" # Pre-trained YOLO-World open-vocabulary model
+#  confidence_threshold: 0.40       # Minimum confidence to score a ball detection
+#  classes:
+#    - "underwater ball"
+#    - "white ball"
+#    - "yellow ball"
+
 ball_detector:
   enabled: true                    # Enable deep-learning ball detection
-  model_name: "yolov8s-worldv2.pt" # Pre-trained YOLO-World open-vocabulary model
-  confidence_threshold: 0.40       # Minimum confidence to score a ball detection
-  classes:
-#    - "underwater ball"
-    - "white ball"
-    - "yellow ball"
-#   - "red ball"
+  model_name: "/Users/dfroehli/Privat/uwr-cam/runs/detect/weights/custom_ball/yolov8s_uwr_ball/weights/best.pt" 
+  confidence_threshold: 0.1       # Minimum confidence to score a ball detection
+  
 
 # Real-time technical metrics overlay in OBS
 overlay:
   enabled: true                    # Enable live metrics overlay
   source_name: "CV_Scores_Overlay" # Name of OBS text source
-  update_interval_sec: 0.5         # Update frequency in seconds
+  update_interval_sec: 0.1         # Update frequency in seconds
   font_face: "Helvetica"
   font_size: 36
   font_style: "Bold"
@@ -56,8 +62,8 @@ marker:
   enabled: true                    # Enable dynamic ball tracking bounding box
   source_name: "Ball_Marker"       # Name of OBS marker image source
   update_interval_sec: 0.1         # Update frequency in seconds
-  border_color: [255, 0, 255]      # RGB color (Neon Green)
-  border_thickness: 8              # Border width in pixels
+  border_color: [0, 255, 255]      # RGB color (Neon Green)
+  border_thickness: 16              # Border width in pixels
 
 # Camera inputs and OBS scene mappings (2 to 6 cameras)
 cameras:

@@ -49,6 +49,8 @@ htmlcov/
 *.engine
 weights/
 datasets/
+runs/
+model-training/
 
 # IDEs
 .idea/
@@ -59,3 +61,4 @@ datasets/
 # Logs & temp files
 *.log
 tmp/
+.lola/
