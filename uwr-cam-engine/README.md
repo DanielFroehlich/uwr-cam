@@ -60,7 +60,6 @@ switching:
   min_dwell_time_sec: 2.5          # Minimum seconds to stay on a scene (anti-flapping)
   hysteresis_threshold: 0.15       # Delta score required to switch away from current camera
   fallback_timeout_sec: 5.0        # Seconds of inactivity before reverting to fallback
-  manual_override: false           # Pause automated switching for director control
 
 # Console logging level
 logging:

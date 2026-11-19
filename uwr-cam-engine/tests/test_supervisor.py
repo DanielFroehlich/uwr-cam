@@ -277,8 +277,9 @@ async def test_supervisor_overlay_includes_model_latency(mock_supervisor):
     call_args = mock_obs.update_text_overlay.call_args
     text_content = call_args[0][1]
 
-    # Overall header latency (average = 12.0ms)
-    assert "Model: 12.0ms" in text_content
+    # Header contains active scene without Model latency
+    assert "CV SCORES [Active: base]" in text_content
+    assert "Model:" not in text_content.splitlines()[0]
     # Per-camera latency
     assert "CAM1: 0.88 [Ball: 0.85, Motion: 0.30, 12.4ms]" in text_content
     assert "CAM2: 0.20 [Ball: 0.00, Motion: 0.15, 11.6ms]" in text_content

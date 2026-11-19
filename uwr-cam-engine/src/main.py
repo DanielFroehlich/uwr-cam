@@ -52,7 +52,9 @@ class EngineSupervisor:
         self.obs_client: OBSClientProtocol = ObswsPythonClient(self.config.obs)
         self.watcher: ConfigWatcher = ConfigWatcher(self.config_path, self.config)
         self.pipeline_mgr: PipelineManager = PipelineManager(
-            self.config.cameras, ball_detector_config=self.config.ball_detector
+            self.config.cameras,
+            ball_detector_config=self.config.ball_detector,
+            motion_detector_config=self.config.motion_detector,
         )
         self.arbiter: SwitchingArbiter = SwitchingArbiter(
             self.config.switching, self.config.cameras
@@ -213,6 +215,10 @@ class EngineSupervisor:
         if old_cfg.ball_detector != new_cfg.ball_detector:
             self.pipeline_mgr.update_ball_detector(new_cfg.ball_detector)
 
+        # Check if motion detector configuration changed (updates dynamically without stream restart)
+        if old_cfg.motion_detector != new_cfg.motion_detector:
+            self.pipeline_mgr.update_motion_detector(new_cfg.motion_detector)
+
         # Check if camera stream endpoints or camera list changed
         old_urls = {c.id: c.rtsp_url for c in old_cfg.cameras}
         new_urls = {c.id: c.rtsp_url for c in new_cfg.cameras}
@@ -220,7 +226,9 @@ class EngineSupervisor:
             logger.info("Camera stream endpoints changed. Reconnecting video ingestion pipelines...")
             self.pipeline_mgr.stop_all()
             self.pipeline_mgr = PipelineManager(
-                new_cfg.cameras, ball_detector_config=new_cfg.ball_detector
+                new_cfg.cameras,
+                ball_detector_config=new_cfg.ball_detector,
+                motion_detector_config=new_cfg.motion_detector,
             )
             self.pipeline_mgr.start_all()
         elif old_cfg.cameras != new_cfg.cameras:
@@ -316,30 +324,35 @@ class EngineSupervisor:
                 if now - self._last_status_log_time >= status_interval:
                     self._last_status_log_time = now
                     summary_parts = []
-                    total_infer_ms = 0.0
-                    infer_count = 0
+                    total_process_ms = 0.0
+                    process_count = 0
                     for cam_id, res in results.items():
                         lat_part = ""
-                        if self.config.ball_detector.enabled:
-                            try:
-                                lat = float(res.inference_time_ms)
-                                total_infer_ms += lat
-                                infer_count += 1
-                                lat_part = f", infer={lat:.1f}ms"
-                            except (TypeError, ValueError, AttributeError):
-                                pass
+                        try:
+                            lat_val = getattr(res, "total_time_ms", 0.0)
+                            if isinstance(lat_val, (int, float)) and lat_val > 0:
+                                lat = float(lat_val)
+                            else:
+                                lat = float(getattr(res, "inference_time_ms", 0.0))
+
+                            if lat > 0:
+                                total_process_ms += lat
+                                process_count += 1
+                                lat_part = f", latency={lat:.1f}ms"
+                        except (TypeError, ValueError, AttributeError):
+                            pass
                         summary_parts.append(
                             f"{cam_id}: [score={res.score:.2f}, motion={res.motion_score:.2f}, ball={res.ball_confidence:.2f}{lat_part}]"
                         )
                     active_scene = self.arbiter.current_scene
                     override_str = " [MANUAL]" if self.arbiter.is_manual_override else ""
-                    avg_infer_str = (
-                        f" | Model Latency: {total_infer_ms / max(1, infer_count):.1f}ms"
-                        if infer_count > 0 and self.config.ball_detector.enabled
+                    avg_lat_str = (
+                        f" | Latency: {total_process_ms / max(1, process_count):.1f}ms"
+                        if process_count > 0
                         else ""
                     )
                     logger.info(
-                        f"[Status] Active: '{active_scene}'{override_str}{avg_infer_str} | Cameras: "
+                        f"[Status] Active: '{active_scene}'{override_str}{avg_lat_str} | Cameras: "
                         + ", ".join(summary_parts)
                     )
 
@@ -348,36 +361,31 @@ class EngineSupervisor:
                     overlay_interval = self.config.overlay.update_interval_sec
                     if now - self._last_overlay_update_time >= overlay_interval:
                         self._last_overlay_update_time = now
-                        total_infer_ms = 0.0
-                        infer_count = 0
                         cam_lines = []
                         for cam in self.config.cameras:
                             cid = cam.id
                             if cid in results:
                                 res = results[cid]
                                 lat_str = ""
-                                if self.config.ball_detector.enabled:
-                                    try:
-                                        lat = float(res.inference_time_ms)
-                                        total_infer_ms += lat
-                                        infer_count += 1
+                                try:
+                                    lat_val = getattr(res, "total_time_ms", 0.0)
+                                    if isinstance(lat_val, (int, float)) and lat_val > 0:
+                                        lat = float(lat_val)
+                                    else:
+                                        lat = float(getattr(res, "inference_time_ms", 0.0))
+
+                                    if lat > 0:
                                         lat_str = f", {lat:.1f}ms"
-                                    except (TypeError, ValueError, AttributeError):
-                                        pass
+                                except (TypeError, ValueError, AttributeError):
+                                    pass
                                 cam_lines.append(
                                     f"{cid.upper()}: {res.score:.2f} [Ball: {res.ball_confidence:.2f}, Motion: {res.motion_score:.2f}{lat_str}]"
                                 )
                             else:
                                 cam_lines.append(f"{cid.upper()}: --")
 
-                        avg_latency = total_infer_ms / max(1, infer_count) if infer_count > 0 else 0.0
-                        model_hdr = (
-                            f" | Model: {avg_latency:.1f}ms"
-                            if avg_latency > 0 and self.config.ball_detector.enabled
-                            else ""
-                        )
                         overlay_lines = [
-                            f"CV SCORES [Active: {self.arbiter.current_scene}{model_hdr}]"
+                            f"CV SCORES [Active: {self.arbiter.current_scene}]"
                         ] + cam_lines
 
                         overlay_text = "\n".join(overlay_lines)

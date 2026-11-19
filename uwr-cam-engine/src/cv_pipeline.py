@@ -15,6 +15,8 @@ logger = logging.getLogger(__name__)
 class MotionDetectorProtocol(Protocol):
     """Protocol for interchangeable motion detection algorithms."""
 
+    min_contour_area: int
+
     def process_frame(self, frame: np.ndarray) -> float:
         """Processes a single video frame and returns a normalized motion density score in [0.0, 1.0]."""
         ...
@@ -22,6 +24,8 @@ class MotionDetectorProtocol(Protocol):
 
 class BallDetectorProtocol(Protocol):
     """Protocol for interchangeable ball detection algorithms (e.g. YOLO, CoreML, Color)."""
+
+    target_resolution: Optional[Tuple[int, int]]
 
     def process_frame(
         self, frame: np.ndarray
@@ -51,11 +55,17 @@ class BallDetectorYOLO:
         classes: Optional[list[str]] = None,
         device: Optional[str] = None,
         enabled: bool = True,
+        aspect_ratio: Optional[Tuple[int, int]] = (16, 9),
     ) -> None:
         self.model_name = model_name
         self.confidence_threshold = confidence_threshold
         self.classes = classes or ["underwater ball", "white ball"]
         self.enabled = enabled
+        self.aspect_ratio = aspect_ratio
+
+        # Model native resolution and calculated target resolution
+        self.native_imgsz: int = 640
+        self.target_resolution: Optional[Tuple[int, int]] = None
 
         # Auto-detect Apple Silicon MPS hardware acceleration
         if device is None:
@@ -68,6 +78,28 @@ class BallDetectorYOLO:
         self._model = None
         if self.enabled:
             self._load_model()
+        else:
+            self._compute_target_resolution()
+
+    def _compute_target_resolution(self) -> None:
+        """Derive target resolution from native model imgsz and training aspect ratio."""
+        if self.aspect_ratio is None:
+            self.target_resolution = (self.native_imgsz, self.native_imgsz)
+            return
+
+        w_ratio, h_ratio = self.aspect_ratio
+        if w_ratio <= 0 or h_ratio <= 0:
+            self.target_resolution = (self.native_imgsz, self.native_imgsz)
+            return
+
+        target_w = self.native_imgsz
+        target_h = int(round(target_w * (h_ratio / w_ratio)))
+        target_h -= (target_h % 2)  # Maintain even height
+        self.target_resolution = (target_w, target_h)
+        logger.info(
+            f"Ball detector target resolution set to {target_w}x{target_h} "
+            f"(native imgsz={self.native_imgsz}, aspect_ratio={w_ratio}:{h_ratio})."
+        )
 
     def _load_model(self) -> None:
         try:
@@ -81,8 +113,28 @@ class BallDetectorYOLO:
             else:
                 from ultralytics import YOLO
                 self._model = YOLO(self.model_name)
+
+            # Auto-detect model's native input resolution (imgsz)
+            imgsz = 640
+            if hasattr(self._model, "overrides") and isinstance(self._model.overrides, dict) and self._model.overrides.get("imgsz"):
+                imgsz = self._model.overrides["imgsz"]
+            elif hasattr(self._model, "args") and isinstance(self._model.args, dict) and self._model.args.get("imgsz"):
+                imgsz = self._model.args["imgsz"]
+            elif hasattr(self._model, "model") and hasattr(self._model.model, "args") and isinstance(self._model.model.args, dict) and self._model.model.args.get("imgsz"):
+                imgsz = self._model.model.args["imgsz"]
+
+            if isinstance(imgsz, (list, tuple)) and len(imgsz) == 2:
+                self.native_imgsz = int(max(imgsz))
+            else:
+                try:
+                    self.native_imgsz = int(imgsz)
+                except (ValueError, TypeError):
+                    self.native_imgsz = 640
+
+            self._compute_target_resolution()
             logger.info(
-                f"YOLO ball detection model '{self.model_name}' initialized successfully on {self.device}."
+                f"YOLO ball detection model '{self.model_name}' initialized successfully on {self.device} "
+                f"(native imgsz: {self.native_imgsz}, target resolution: {self.target_resolution})."
             )
         except Exception as e:
             logger.error(
@@ -91,6 +143,7 @@ class BallDetectorYOLO:
                 exc_info=True,
             )
             self._model = None
+            self._compute_target_resolution()
 
     def update_config(
         self,
@@ -98,18 +151,24 @@ class BallDetectorYOLO:
         confidence_threshold: float = 0.25,
         model_name: Optional[str] = None,
         classes: Optional[list[str]] = None,
+        aspect_ratio: Optional[Tuple[int, int]] = (16, 9),
     ) -> None:
         """Update detector configuration dynamically at runtime."""
         target_model = model_name or self.model_name
         target_classes = classes or self.classes
         model_changed = (self.model_name != target_model)
         classes_changed = (self.classes != target_classes)
+        ar_changed = (self.aspect_ratio != aspect_ratio)
         was_disabled = not self.enabled
 
         self.enabled = enabled
         self.confidence_threshold = confidence_threshold
         self.model_name = target_model
         self.classes = target_classes
+        self.aspect_ratio = aspect_ratio
+
+        if ar_changed:
+            self._compute_target_resolution()
 
         if not self.enabled:
             logger.info("Ball detector disabled dynamically.")

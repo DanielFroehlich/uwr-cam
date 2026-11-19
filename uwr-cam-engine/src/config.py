@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional, Tuple
 
 import yaml
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -89,10 +89,6 @@ class SwitchingConfig(BaseModel):
         ge=1.0,
         description="Seconds without detections before reverting to fallback scene"
     )
-    manual_override: bool = Field(
-        default=False,
-        description="Pause automated switching to allow director manual control"
-    )
     scene_poll_interval_sec: float = Field(
         default=0.5,
         ge=0.1,
@@ -172,6 +168,43 @@ class BallDetectorConfig(BaseModel):
         default=["underwater ball", "white ball"],
         description="Open-vocabulary prompts for YOLO-World detection",
     )
+    aspect_ratio: Optional[Tuple[int, int]] = Field(
+        default=(16, 9),
+        description="Training aspect ratio (width, height) e.g. [16, 9]. None to disable aspect ratio normalization.",
+    )
+
+    @field_validator("aspect_ratio", mode="before")
+    @classmethod
+    def parse_aspect_ratio(cls, v: Any) -> Optional[Tuple[int, int]]:
+        if v is None:
+            return None
+        if isinstance(v, str):
+            v = v.strip()
+            if not v or v.lower() in ("none", "null"):
+                return None
+            parts = v.split(":") if ":" in v else v.split("/")
+            if len(parts) == 2:
+                try:
+                    w, h = int(parts[0].strip()), int(parts[1].strip())
+                    if w > 0 and h > 0:
+                        return (w, h)
+                except ValueError:
+                    pass
+            raise ValueError(f"Invalid aspect_ratio string '{v}'. Expected format like '16:9'")
+        if isinstance(v, (list, tuple)):
+            if len(v) == 2 and int(v[0]) > 0 and int(v[1]) > 0:
+                return (int(v[0]), int(v[1]))
+            raise ValueError(f"Invalid aspect_ratio sequence {v}. Expected 2 positive integers [W, H]")
+        raise ValueError(f"Invalid aspect_ratio type {type(v)}. Expected [W, H] or 'W:H'")
+
+
+class MotionDetectorConfig(BaseModel):
+    """Configuration for adaptive background subtraction motion detection."""
+    min_contour_area: int = Field(
+        default=300,
+        ge=1,
+        description="Minimum pixel area for detected motion blob (filters ripple noise)",
+    )
 
 
 class EngineConfig(BaseModel):
@@ -183,6 +216,10 @@ class EngineConfig(BaseModel):
     ball_detector: BallDetectorConfig = Field(
         default_factory=BallDetectorConfig,
         description="YOLO ball detector settings",
+    )
+    motion_detector: MotionDetectorConfig = Field(
+        default_factory=MotionDetectorConfig,
+        description="MOG2 motion detector settings",
     )
     overlay: OverlayConfig = Field(
         default_factory=OverlayConfig,

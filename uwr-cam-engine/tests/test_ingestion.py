@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-from src.ingestion import FrameGrabber
+from src.ingestion import FrameGrabber, get_decoding_core_pool
 
 
 def test_grabber_initial_state():
@@ -63,3 +63,67 @@ def test_grabber_reconnect_on_grab_failure(mocker):
 
     grabber.stop()
     assert mock_cap.release.called
+
+
+def test_get_decoding_core_pool_apple_silicon(mocker):
+    """Verify Apple Silicon isolates Performance cores (perflevel1)."""
+    mocker.patch("sys.platform", "darwin")
+    mocker.patch("subprocess.check_output", return_value="12\n")
+
+    pool = get_decoding_core_pool()
+    assert pool == 12
+
+
+def test_get_decoding_core_pool_intel_mac(mocker):
+    """Verify Intel Mac falls back to hw.physicalcpu when perflevel1 does not exist."""
+    mocker.patch("sys.platform", "darwin")
+
+    def mock_check_output(cmd, **kwargs):
+        if "hw.perflevel1.physicalcpu" in cmd:
+            raise Exception("sysctl: unknown oid 'hw.perflevel1.physicalcpu'")
+        if "hw.physicalcpu" in cmd:
+            return "4\n"
+        raise Exception("unknown sysctl")
+
+    mocker.patch("subprocess.check_output", side_effect=mock_check_output)
+
+    pool = get_decoding_core_pool()
+    assert pool == 4
+
+
+def test_get_decoding_core_pool_linux_fallback(mocker):
+    """Verify Linux and containers fall back to os.cpu_count()."""
+    mocker.patch("sys.platform", "linux")
+    mocker.patch("os.cpu_count", return_value=8)
+
+    pool = get_decoding_core_pool()
+    assert pool == 8
+
+
+def test_grabber_passes_n_threads_param(mocker):
+    """Verify FrameGrabber passes CAP_PROP_N_THREADS when num_threads is specified."""
+    mock_cap = MagicMock()
+    mock_cap.isOpened.return_value = True
+    mock_vc = mocker.patch("cv2.VideoCapture", return_value=mock_cap)
+
+    import cv2
+
+    grabber = FrameGrabber(
+        camera_id="cam1",
+        rtsp_url="rtsp://localhost:8554/cam1/low",
+        num_threads=2,
+    )
+    success = grabber._init_capture()
+
+    assert success is True
+    assert grabber.is_connected is True
+    assert grabber.connection_epoch == 1
+
+    # Verify VideoCapture called with [CAP_PROP_N_THREADS, 2]
+    mock_vc.assert_called_once_with(
+        "rtsp://localhost:8554/cam1/low",
+        cv2.CAP_FFMPEG,
+        [cv2.CAP_PROP_N_THREADS, 2],
+    )
+    mock_cap.set.assert_called_once_with(cv2.CAP_PROP_BUFFERSIZE, 1)
+

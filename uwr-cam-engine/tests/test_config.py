@@ -7,11 +7,13 @@ import yaml
 from pydantic import ValidationError
 
 from src.config import (
+    BallDetectorConfig,
     CameraConfig,
     CameraWeights,
     ConfigurationError,
     EngineConfig,
     LoggingConfig,
+    MotionDetectorConfig,
     OBSConfig,
     SwitchingConfig,
     load_config,
@@ -33,7 +35,6 @@ def sample_valid_config_dict() -> dict:
             "min_dwell_time_sec": 2.0,
             "hysteresis_threshold": 0.2,
             "fallback_timeout_sec": 4.0,
-            "manual_override": False,
         },
         "logging": {"level": "DEBUG"},
         "cameras": [
@@ -270,3 +271,67 @@ def test_configuration_error_exception():
     assert issubclass(ConfigurationError, ValueError)
     err = ConfigurationError("Missing scene: cam4")
     assert str(err) == "Missing scene: cam4"
+
+
+def test_ball_detector_aspect_ratio_config():
+    # Defaults to (16, 9)
+    cfg_default = BallDetectorConfig()
+    assert cfg_default.aspect_ratio == (16, 9)
+
+    # String format "16:9"
+    cfg_str = BallDetectorConfig(aspect_ratio="16:9")
+    assert cfg_str.aspect_ratio == (16, 9)
+
+    # String format "4:3"
+    cfg_4_3 = BallDetectorConfig(aspect_ratio="4:3")
+    assert cfg_4_3.aspect_ratio == (4, 3)
+
+    # List format [16, 9]
+    cfg_list = BallDetectorConfig(aspect_ratio=[16, 9])
+    assert cfg_list.aspect_ratio == (16, 9)
+
+    # None or "none"
+    cfg_none = BallDetectorConfig(aspect_ratio=None)
+    assert cfg_none.aspect_ratio is None
+
+    cfg_none_str = BallDetectorConfig(aspect_ratio="none")
+    assert cfg_none_str.aspect_ratio is None
+
+    # Invalid string / sequence raises ValidationError
+    with pytest.raises(ValidationError, match="Invalid aspect_ratio"):
+        BallDetectorConfig(aspect_ratio="invalid")
+
+    with pytest.raises(ValidationError, match="Invalid aspect_ratio"):
+        BallDetectorConfig(aspect_ratio=[16, -9])
+
+    with pytest.raises(ValidationError, match="Invalid aspect_ratio"):
+        BallDetectorConfig(aspect_ratio=[16])
+
+
+def test_motion_detector_config():
+    # Defaults to min_contour_area=300
+    cfg_default = MotionDetectorConfig()
+    assert cfg_default.min_contour_area == 300
+
+    # Custom value
+    cfg_custom = MotionDetectorConfig(min_contour_area=150)
+    assert cfg_custom.min_contour_area == 150
+
+    # Must be >= 1
+    with pytest.raises(ValidationError):
+        MotionDetectorConfig(min_contour_area=0)
+
+    with pytest.raises(ValidationError):
+        MotionDetectorConfig(min_contour_area=-50)
+
+
+def test_load_config_with_motion_detector(tmp_path):
+    config_file = tmp_path / "config.yaml"
+    data = sample_valid_config_dict()
+    data["motion_detector"] = {"min_contour_area": 450}
+    config_file.write_text(yaml.dump(data), encoding="utf-8")
+
+    cfg = load_config(config_file)
+    assert cfg.motion_detector.min_contour_area == 450
+
+

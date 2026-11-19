@@ -36,7 +36,6 @@ def sample_switching_config():
         min_dwell_time_sec=2.0,
         hysteresis_threshold=0.15,
         fallback_timeout_sec=5.0,
-        manual_override=False,
     )
 
 
@@ -125,8 +124,8 @@ def test_arbiter_fallback_timeout_on_inactivity(sample_switching_config, sample_
 
 
 def test_arbiter_manual_override_suppresses_switching(sample_switching_config, sample_cameras):
-    sample_switching_config.manual_override = True
-    arbiter = SwitchingArbiter(sample_switching_config, sample_cameras, initial_scene="base")
+    # Director engaged an unmanaged scene (e.g. commentary)
+    arbiter = SwitchingArbiter(sample_switching_config, sample_cameras, initial_scene="commentary")
     t0 = 100.0
     arbiter.last_switch_time = t0 - 10.0
 
@@ -138,7 +137,8 @@ def test_arbiter_manual_override_suppresses_switching(sample_switching_config, s
 
     target = arbiter.evaluate(results, now=t0)
     assert target is None
-    assert arbiter.current_scene == "base"
+    assert arbiter.current_scene == "commentary"
+    assert arbiter.is_manual_override is True
 
 
 def test_arbiter_auto_scenes_and_manual_scene_identification(sample_switching_config, sample_cameras):
@@ -163,10 +163,6 @@ def test_arbiter_is_manual_override_property(sample_switching_config, sample_cam
     # Switch back to auto scene
     arbiter.update_current_scene("cam2")
     assert arbiter.is_manual_override is False
-
-    # Config-level manual override
-    arbiter.config.manual_override = True
-    assert arbiter.is_manual_override is True
 
 
 def test_arbiter_unmanaged_scene_suppresses_automated_switching(sample_switching_config, sample_cameras):

@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import logging
+import os
+import subprocess
+import sys
 import threading
 import time
 from typing import Optional, Tuple
@@ -11,6 +14,42 @@ import cv2
 import numpy as np
 
 logger = logging.getLogger(__name__)
+
+
+def get_decoding_core_pool() -> int:
+    """Detect available core pool for video decoding based on hardware topology.
+
+    On Apple Silicon, isolates the high-throughput Performance tier (perflevel1)
+    to protect the Super/P-cores (perflevel0) for YOLO, OBS, and real-time arbitration.
+    On Intel Macs, Linux, and containers, falls back to physical/logical CPU count.
+    """
+    if sys.platform == "darwin":
+        # 1. Apple Silicon hybrid tier: query Performance core count (perflevel1)
+        try:
+            val = subprocess.check_output(
+                ["sysctl", "-n", "hw.perflevel1.physicalcpu"],
+                text=True,
+                stderr=subprocess.DEVNULL,
+            ).strip()
+            if val.isdigit() and int(val) > 0:
+                return int(val)
+        except Exception:
+            pass
+
+        # 2. Intel Mac fallback: homogeneous physical core count
+        try:
+            val = subprocess.check_output(
+                ["sysctl", "-n", "hw.physicalcpu"],
+                text=True,
+                stderr=subprocess.DEVNULL,
+            ).strip()
+            if val.isdigit() and int(val) > 0:
+                return int(val)
+        except Exception:
+            pass
+
+    # 3. Linux / container fallback
+    return os.cpu_count() or 4
 
 
 class FrameGrabber:
@@ -25,10 +64,12 @@ class FrameGrabber:
         camera_id: str,
         rtsp_url: str,
         reconnect_interval_sec: float = 3.0,
+        num_threads: Optional[int] = None,
     ) -> None:
         self.camera_id = camera_id
         self.rtsp_url = rtsp_url
         self.reconnect_interval_sec = reconnect_interval_sec
+        self.num_threads = num_threads
 
         self._running = False
         self._thread: Optional[threading.Thread] = None
@@ -38,11 +79,18 @@ class FrameGrabber:
         self._latest_frame: Optional[np.ndarray] = None
         self._last_frame_time: float = 0.0
         self._connected = False
+        self._connection_epoch: int = 0
 
     @property
     def is_connected(self) -> bool:
         with self._lock:
             return self._connected
+
+    @property
+    def connection_epoch(self) -> int:
+        """Monotonically increasing counter incremented on each new connection session."""
+        with self._lock:
+            return self._connection_epoch
 
     def start(self) -> None:
         """Starts the background frame grabber thread."""
@@ -91,10 +139,20 @@ class FrameGrabber:
 
     def _init_capture(self) -> bool:
         self._release_cap()
-        logger.debug(f"[{self.camera_id}] Opening RTSP stream: {self.rtsp_url}")
-        
-        # In OpenCV, cv2.CAP_FFMPEG is used. Setting buffer size to 1 if supported.
-        cap = cv2.VideoCapture(self.rtsp_url, cv2.CAP_FFMPEG)
+        logger.debug(
+            f"[{self.camera_id}] Opening RTSP stream: {self.rtsp_url} "
+            f"(threads: {self.num_threads or 'default'})"
+        )
+
+        open_params = []
+        if self.num_threads is not None and self.num_threads > 0:
+            open_params = [cv2.CAP_PROP_N_THREADS, self.num_threads]
+
+        cap = (
+            cv2.VideoCapture(self.rtsp_url, cv2.CAP_FFMPEG, open_params)
+            if open_params
+            else cv2.VideoCapture(self.rtsp_url, cv2.CAP_FFMPEG)
+        )
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
         if not cap.isOpened():
@@ -104,7 +162,11 @@ class FrameGrabber:
         self._cap = cap
         with self._lock:
             self._connected = True
-        logger.info(f"[{self.camera_id}] Successfully opened RTSP stream")
+            self._connection_epoch += 1
+        logger.info(
+            f"[{self.camera_id}] Successfully opened RTSP stream "
+            f"(session epoch: {self._connection_epoch}, decoder threads: {self.num_threads or 'default'})"
+        )
         return True
 
     def _capture_loop(self) -> None:

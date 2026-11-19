@@ -18,7 +18,6 @@ switching:
   min_dwell_time_sec: 2.5          # Minimum seconds to stay on a scene (anti-flapping)
   hysteresis_threshold: 0.15       # Delta score required to switch away from current camera
   fallback_timeout_sec: 5.0        # Seconds of inactivity before reverting to fallback scene
-  manual_override: false           # Pause automated switching for director control
   scene_poll_interval_sec: 0.5     # Interval in seconds to poll OBS active scene for director manual overrides
   default_weights:                 # Default scoring weights if not specified per camera
     ball: 0.7
@@ -34,9 +33,15 @@ ball_detector:
   enabled: true                    # Enable deep-learning ball detection
   model_name: "yolov8s-worldv2.pt" # Pre-trained YOLO-World open-vocabulary model
   confidence_threshold: 0.25       # Minimum confidence to score a ball detection
+  aspect_ratio: [16, 9]            # Training dataset aspect ratio (W, H)
   classes:
     - "underwater ball"
     - "white ball"
+
+# Motion detection engine configuration
+motion_detector:
+  min_contour_area: 300            # Minimum pixel area for detected motion blob (filters ripple noise)
+
 
 # Real-time technical metrics overlay in OBS
 overlay:

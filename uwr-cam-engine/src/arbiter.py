@@ -56,8 +56,8 @@ class SwitchingArbiter:
 
     @property
     def is_manual_override(self) -> bool:
-        """Return True if manual override is active (via config or manual OBS scene)."""
-        return self.config.manual_override or not self.is_auto_scene(self.current_scene)
+        """Return True if manual override is active (manual OBS scene engaged by director)."""
+        return not self.is_auto_scene(self.current_scene)
 
     def update_current_scene(self, scene_name: str, now: Optional[float] = None) -> None:
         """Synchronizes arbiter state with actual active program scene from OBS."""
@@ -97,15 +97,11 @@ class SwitchingArbiter:
         """
         current_time = now if now is not None else time.time()
 
-        # Rule 1: Manual override active via configuration -> do not switch
-        if self.config.manual_override:
-            logger.debug("Manual override active via configuration. Skipping automated switching.")
-            return None
-
-        # Rule 1b: Manual scene active in OBS (human director override) -> do not switch
+        # Rule 1: Manual scene active in OBS (human director override) -> do not switch
         if not self.is_auto_scene(self.current_scene):
             logger.debug(
-                f"Manual scene '{self.current_scene}' active in OBS. Skipping automated switching."
+                f"Director manual override engaged: manual scene '{self.current_scene}' active in OBS. "
+                "Skipping automated switching."
             )
             return None
 

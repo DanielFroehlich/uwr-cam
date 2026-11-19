@@ -15,10 +15,9 @@ obs:
 # Switching and arbitration parameters
 switching:
   fallback_scene: "auto-base"           # Default overview scene if no high-confidence tracking
-  min_dwell_time_sec: 3.0          # Minimum seconds to stay on a scene (anti-flapping)
+  min_dwell_time_sec: 2.0          # Minimum seconds to stay on a scene (anti-flapping)
   hysteresis_threshold: 0.10       # Delta score required to switch away from current camera
-  fallback_timeout_sec: 5.0        # Seconds of inactivity before reverting to fallback scene
-  manual_override: false           # Pause automated switching for director control
+  fallback_timeout_sec: 2.0       # Seconds of inactivity before reverting to fallback scene
   scene_poll_interval_sec: 0.5     # Interval in seconds to poll OBS active scene for director manual overrides
   default_weights:
     ball: 0.5
@@ -27,7 +26,7 @@ switching:
 # Logging configuration
 logging:
   level: "INFO"                    # DEBUG, INFO, WARNING, ERROR
-  status_interval_sec: 2.0         # Seconds between periodic CV status summaries
+  status_interval_sec: 5.0         # Seconds between periodic CV status summaries
 
 # Ball detection engine configuration
 # yolo world model;:
@@ -44,7 +43,12 @@ ball_detector:
   enabled: true                    # Enable deep-learning ball detection
   model_name: "/Users/dfroehli/Privat/uwr-cam/runs/detect/weights/custom_ball/yolov8s_uwr_ball/weights/best.pt" 
   confidence_threshold: 0.1       # Minimum confidence to score a ball detection
-  
+  aspect_ratio: [16, 9]            # Training dataset aspect ratio (W, H)
+
+# Motion detection engine configuration
+motion_detector:
+  min_contour_area: 300            # Minimum pixel area for detected motion blob (filters ripple noise)
+
 
 # Real-time technical metrics overlay in OBS
 overlay:
@@ -69,7 +73,7 @@ marker:
 cameras:
   - id: "cam1"
     name: "Underwater Goal Left"
-    rtsp_url: "rtsp://localhost:8554/cam1/low"
+    rtsp_url: "rtsp://uwr-cam1:554/user=admin&password=&channel=1&stream=0.sdp?"
     obs_scene: "auto-cam1"
 
   - id: "cam2"
